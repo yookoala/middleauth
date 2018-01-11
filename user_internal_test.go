@@ -1,6 +1,7 @@
 package middleauth
 
 import (
+	"context"
 	"testing"
 
 	"github.com/jinzhu/gorm"
@@ -24,9 +25,11 @@ func TestLoadOrCreateUser(t *testing.T) {
 		UserEmail{},
 	)
 
+	callback := loadOrCreateUser(db)
+
 	// attempt to create user on first login
-	u1, err := loadOrCreateUser(
-		db,
+	u1, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy@foobar.com",
@@ -55,8 +58,8 @@ func TestLoadOrCreateUser(t *testing.T) {
 
 	// should retrieve the same user on second login
 	// regardless of the name
-	u2, err := loadOrCreateUser(
-		db,
+	u2, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user another time",
 			PrimaryEmail: "dummy@foobar.com",
@@ -74,8 +77,8 @@ func TestLoadOrCreateUser(t *testing.T) {
 	}
 
 	// try to login with no email
-	u3, err := loadOrCreateUser(
-		db,
+	u3, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user",
 			PrimaryEmail: "",
@@ -101,9 +104,11 @@ func TestLoadOrCreateUser_UserEmail(t *testing.T) {
 		UserEmail{},
 	)
 
+	callback := loadOrCreateUser(db)
+
 	// attempt to create user on first login
-	u1, err := loadOrCreateUser(
-		db,
+	u1, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy1@foobar.com",
@@ -117,8 +122,8 @@ func TestLoadOrCreateUser_UserEmail(t *testing.T) {
 		t.Errorf("expected user, got nil")
 	}
 
-	u2, err := loadOrCreateUser(
-		db,
+	u2, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy2@foobar.com",
@@ -159,8 +164,9 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 		UserEmail{},
 	)
 	db.Exec("DROP TABLE user_emails;")
-	u1, err := loadOrCreateUser(
-		db,
+	callback := loadOrCreateUser(db)
+	u1, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy@foobar.com",
@@ -184,8 +190,8 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 		User{},
 		UserEmail{},
 	)
-	u2, err := loadOrCreateUser(
-		db,
+	u2, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy2@foobar.com",
@@ -205,8 +211,8 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 	}
 
 	db.Exec("DROP TABLE users;")
-	u3, err := loadOrCreateUser(
-		db,
+	u3, err := callback(
+		context.TODO(),
 		User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy3@foobar.com",

@@ -5,7 +5,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/go-restit/lzjson"
-	"github.com/jinzhu/gorm"
 	"github.com/mrjones/oauth"
 	"gopkg.in/jose.v1/crypto"
 )
@@ -49,7 +48,7 @@ func TwitterConsumer(provider AuthProvider) *oauth.Consumer {
 // TwitterCallback returns a http.Handler for Twitter account login handing
 func TwitterCallback(
 	c *oauth.Consumer,
-	db *gorm.DB,
+	userCallback UserCallback,
 	tokenConsume func(tokenKey string) *oauth.RequestToken,
 	genLoginCookie CookieFactory,
 	jwtKey, successURL, errURL string,
@@ -139,8 +138,8 @@ func TwitterCallback(
 
 		// TODO: detect read  / decode error
 		// TODO: check if the email has been verified or not
-		authUser, err := loadOrCreateUser(
-			db,
+		authUser, err := userCallback(
+			r.Context(),
 			User{
 				Name:         result.Get("name").String(),
 				PrimaryEmail: result.Get("email").String(),

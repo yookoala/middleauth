@@ -6,7 +6,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/go-restit/lzjson"
-	"github.com/jinzhu/gorm"
 	"gopkg.in/jose.v1/crypto"
 
 	"golang.org/x/oauth2"
@@ -29,7 +28,7 @@ func FacebookConfig(provider AuthProvider, redirectURL string) *oauth2.Config {
 // FacebookCallback returns a http.Handler for Google account login handing
 func FacebookCallback(
 	conf *oauth2.Config,
-	db *gorm.DB,
+	userCallback UserCallback,
 	genLoginCookie CookieFactory,
 	jwtKey, successURL, errURL string,
 ) http.HandlerFunc {
@@ -68,8 +67,8 @@ func FacebookCallback(
 
 		// TODO: detect read  / decode error
 		// TODO: check if the email has been verified or not
-		authUser, err := loadOrCreateUser(
-			db,
+		authUser, err := userCallback(
+			r.Context(),
 			User{
 				Name:         result.Get("name").String(),
 				PrimaryEmail: result.Get("email").String(),

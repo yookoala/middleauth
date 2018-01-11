@@ -1,6 +1,7 @@
 package middleauth
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -101,57 +102,51 @@ func (err LoginError) GoString() string {
 	return "LoginError(" + err.String() + ")"
 }
 
-func loadOrCreateUser(db *gorm.DB, authUser User, verifiedEmails []string) (confirmedUser *User, err error) {
+// UserCallback is the interface for authenticator
+// to interact with, once acquired the user information.
+//
+// It is responsible to:
+// 1. Search backend storage to see if the user already exists.
+// 2. If not, create a user entry as appropriated.
+// 3. Return a *User for cookie, or return nil with error.
+type UserCallback func(ctx context.Context, authUser User, emails []string) (confirmedUser *User, err error)
 
-	// search existing user with the email
-	var userEmail UserEmail
-	var prevUser User
+func loadOrCreateUser(db *gorm.DB) UserCallback {
 
-	if db.First(&prevUser, "primary_email = ?", authUser.PrimaryEmail); prevUser.PrimaryEmail != "" {
-		// TODO: log this?
-		authUser = prevUser
-	} else if db.First(&userEmail, "email = ?", authUser.PrimaryEmail); userEmail.Email != "" {
-		// TODO: log this?
-		db.First(&authUser, "id = ?", userEmail.UserID)
-	} else if authUser.PrimaryEmail == "" {
-		err = &LoginError{Type: ErrNoEmail}
-	} else {
+	return func(ctx context.Context, authUser User, verifiedEmails []string) (confirmedUser *User, err error) {
 
-		tx := db.Begin()
+		// search existing user with the email
+		var userEmail UserEmail
+		var prevUser User
 
-		// create user
-		if res := tx.Create(&authUser); res.Error != nil {
-			// append authUser to error info
-			err = &LoginError{
-				Type:   ErrDatabase,
-				Action: "create user",
-				Err:    res.Error,
+		if db.First(&prevUser, "primary_email = ?", authUser.PrimaryEmail); prevUser.PrimaryEmail != "" {
+			// TODO: log this?
+			authUser = prevUser
+		} else if db.First(&userEmail, "email = ?", authUser.PrimaryEmail); userEmail.Email != "" {
+			// TODO: log this?
+			db.First(&authUser, "id = ?", userEmail.UserID)
+		} else if authUser.PrimaryEmail == "" {
+			err = &LoginError{Type: ErrNoEmail}
+		} else {
+
+			tx := db.Begin()
+
+			// create user
+			if res := tx.Create(&authUser); res.Error != nil {
+				// append authUser to error info
+				err = &LoginError{
+					Type:   ErrDatabase,
+					Action: "create user",
+					Err:    res.Error,
+				}
+				tx.Rollback()
+				return
 			}
-			tx.Rollback()
-			return
-		}
 
-		// create user-email relation
-		newUserEmail := UserEmail{
-			UserID: authUser.ID,
-			Email:  authUser.PrimaryEmail,
-		}
-		if res := tx.Create(&newUserEmail); res.Error != nil {
-			// append newUserEmail to error info
-			err = &LoginError{
-				Type:   ErrDatabase,
-				Action: "create user-email relation " + newUserEmail.Email,
-				Err:    res.Error,
-			}
-			tx.Rollback()
-			return
-		}
-
-		// also input UserEmail from verifiedEmails, if len not 0
-		for _, email := range verifiedEmails {
+			// create user-email relation
 			newUserEmail := UserEmail{
 				UserID: authUser.ID,
-				Email:  email,
+				Email:  authUser.PrimaryEmail,
 			}
 			if res := tx.Create(&newUserEmail); res.Error != nil {
 				// append newUserEmail to error info
@@ -163,13 +158,31 @@ func loadOrCreateUser(db *gorm.DB, authUser User, verifiedEmails []string) (conf
 				tx.Rollback()
 				return
 			}
+
+			// also input UserEmail from verifiedEmails, if len not 0
+			for _, email := range verifiedEmails {
+				newUserEmail := UserEmail{
+					UserID: authUser.ID,
+					Email:  email,
+				}
+				if res := tx.Create(&newUserEmail); res.Error != nil {
+					// append newUserEmail to error info
+					err = &LoginError{
+						Type:   ErrDatabase,
+						Action: "create user-email relation " + newUserEmail.Email,
+						Err:    res.Error,
+					}
+					tx.Rollback()
+					return
+				}
+			}
+
+			tx.Commit()
 		}
 
-		tx.Commit()
+		if err == nil {
+			confirmedUser = &authUser
+		}
+		return
 	}
-
-	if err == nil {
-		confirmedUser = &authUser
-	}
-	return
 }

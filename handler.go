@@ -87,6 +87,7 @@ func LoginHandler(
 	mux := http.NewServeMux()
 	oauth2URL := baseURL + oauth2Path   // full URL to oauth2 path
 	successURL := baseURL + successPath // full URL to success page
+	userCallback := loadOrCreateUser(db)
 
 	if provider := FindProvider("google", providers); provider != nil {
 		mux.Handle(oauth2Path+"/google", RedirectHandler(
@@ -101,7 +102,7 @@ func LoginHandler(
 				*provider,
 				oauth2URL+"/google/callback",
 			),
-			db,
+			userCallback,
 			genLoginCookie,
 			jwtSecret,
 			successURL,
@@ -124,7 +125,7 @@ func LoginHandler(
 				*provider,
 				oauth2URL+"/facebook/callback",
 			),
-			db,
+			userCallback,
 			genLoginCookie,
 			jwtSecret,
 			successURL,
@@ -145,7 +146,7 @@ func LoginHandler(
 				*provider,
 				oauth2URL+"/github/callback",
 			),
-			db,
+			userCallback,
 			genLoginCookie,
 			jwtSecret,
 			successURL,
@@ -163,7 +164,7 @@ func LoginHandler(
 		))
 		mux.Handle(oauth2Path+"/twitter/callback", TwitterCallback(
 			TwitterConsumer(*provider),
-			db,
+			userCallback,
 			TokenConsume,
 			genLoginCookie,
 			jwtSecret,
