@@ -10,9 +10,9 @@ import (
 )
 
 // DecodeTokenStr parses token string into JWT token
-func DecodeTokenStr(key, tokenStr string) (token jwt.JWT, err error) {
+func DecodeTokenStr(key, tokenStr string, method crypto.SigningMethod) (token jwt.JWT, err error) {
 	token, _ = jws.ParseJWT([]byte(tokenStr))
-	if err = token.Validate([]byte(key), crypto.SigningMethodHS256); err != nil {
+	if err = token.Validate([]byte(key), method); err != nil {
 		err = fmt.Errorf("error validating token: %s", err.Error())
 		return
 	}
@@ -20,14 +20,14 @@ func DecodeTokenStr(key, tokenStr string) (token jwt.JWT, err error) {
 }
 
 // EncodeTokenStr encode a given claim as a JWT token string
-func EncodeTokenStr(key string, claims jws.Claims) (tokenStr string, err error) {
-	jwtToken := jws.NewJWT(claims, crypto.SigningMethodHS256)
+func EncodeTokenStr(key string, claims jws.Claims, method crypto.SigningMethod) (tokenStr string, err error) {
+	jwtToken := jws.NewJWT(claims, method)
 	serializedToken, err := jwtToken.Serialize([]byte(key))
 	tokenStr = string(serializedToken)
 	return
 }
 
-func authJWTCookie(cookie *http.Cookie, jwtKey string, authUser User) *http.Cookie {
+func authJWTCookie(cookie *http.Cookie, jwtKey string, method crypto.SigningMethod, authUser User) *http.Cookie {
 
 	// Create JWS claims with the user info
 	claims := jws.Claims{}
@@ -37,6 +37,6 @@ func authJWTCookie(cookie *http.Cookie, jwtKey string, authUser User) *http.Cook
 	claims.SetExpiration(cookie.Expires)
 
 	// encode token and store in cookies
-	cookie.Value, _ = EncodeTokenStr(jwtKey, claims)
+	cookie.Value, _ = EncodeTokenStr(jwtKey, claims, method)
 	return cookie
 }

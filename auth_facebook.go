@@ -7,6 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/go-restit/lzjson"
 	"github.com/jinzhu/gorm"
+	"gopkg.in/jose.v1/crypto"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/facebook"
@@ -93,7 +94,13 @@ func FacebookCallback(
 
 		// set authUser digest to cookie as jwt
 		http.SetCookie(w,
-			authJWTCookie(genLoginCookie(r), jwtKey, *authUser))
+			authJWTCookie(
+				genLoginCookie(r),
+				jwtKey,
+				crypto.SigningMethodHS256,
+				*authUser,
+			),
+		)
 
 		http.Redirect(w, r, successURL, http.StatusTemporaryRedirect)
 	}

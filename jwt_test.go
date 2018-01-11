@@ -19,7 +19,11 @@ func TestDecodeTokenStr(t *testing.T) {
 	jwtToken := jws.NewJWT(claims, crypto.SigningMethodHS256)
 	serializedToken, _ := jwtToken.Serialize([]byte(key))
 
-	parsedToken, err := middleauth.DecodeTokenStr(key, string(serializedToken))
+	parsedToken, err := middleauth.DecodeTokenStr(
+		key,
+		string(serializedToken),
+		crypto.SigningMethodHS256,
+	)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
 	}
@@ -42,7 +46,11 @@ func TestDecodeTokenStr_error(t *testing.T) {
 	jwtToken := jws.NewJWT(claims, crypto.SigningMethodHS256)
 	serializedToken, _ := jwtToken.Serialize([]byte(key))
 
-	_, err := middleauth.DecodeTokenStr("wrongkey", string(serializedToken))
+	_, err := middleauth.DecodeTokenStr(
+		"wrongkey",
+		string(serializedToken),
+		crypto.SigningMethodHS256,
+	)
 	if err == nil {
 		t.Errorf("expected error and got nil")
 	}
@@ -61,7 +69,11 @@ func TestDecodeTokenStr_expired(t *testing.T) {
 	jwtToken := jws.NewJWT(claims, crypto.SigningMethodHS256)
 	serializedToken, _ := jwtToken.Serialize([]byte(key))
 
-	_, err := middleauth.DecodeTokenStr(key, string(serializedToken))
+	_, err := middleauth.DecodeTokenStr(
+		key,
+		string(serializedToken),
+		crypto.SigningMethodHS256,
+	)
 	if err == nil {
 		t.Errorf("expected error and got nil")
 	}
@@ -76,12 +88,21 @@ func TestEncodeTokenStr(t *testing.T) {
 		"hello": "world",
 		"foo":   "bar",
 	}
-	tokenStr, err := middleauth.EncodeTokenStr(key, claims)
+	tokenStr, err := middleauth.EncodeTokenStr(
+		key,
+		claims,
+		crypto.SigningMethodHS256,
+	)
 	if err != nil {
 		t.Errorf("unexpected error %#v", err.Error())
 	}
 
-	parsedToken, err := middleauth.DecodeTokenStr(key, tokenStr)
+	parsedToken, err := middleauth.DecodeTokenStr(
+		key,
+		tokenStr,
+		crypto.SigningMethodHS256,
+	)
+
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/go-restit/lzjson"
 	"github.com/jinzhu/gorm"
 	"github.com/mrjones/oauth"
+	"gopkg.in/jose.v1/crypto"
 )
 
 var tokens map[string]*oauth.RequestToken
@@ -128,7 +129,7 @@ func TwitterCallback(
 				"protected": false,
 				"screen_name": "theSeanCook",
 				"show_all_inline_media": true,
-				"statuses_count": 2609,
+				"statuses_count": 2609,aI was
 				"time_zone": "Pacific Time (US & Canada)",
 				"url": null,
 				"utc_offset": -28800,
@@ -164,7 +165,13 @@ func TwitterCallback(
 
 		// set authUser digest to cookie as jwt
 		http.SetCookie(w,
-			authJWTCookie(genLoginCookie(r), jwtKey, *authUser))
+			authJWTCookie(
+				genLoginCookie(r),
+				jwtKey,
+				crypto.SigningMethodHS256,
+				*authUser,
+			),
+		)
 
 		http.Redirect(w, r, successURL, http.StatusTemporaryRedirect)
 	}
