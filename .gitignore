@@ -1,0 +1,6 @@
+# ignore coverage report and profile output
+/coverage.txt
+/profile.out
+
+# ignore dotenv file
+.env
