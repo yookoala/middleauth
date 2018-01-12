@@ -3,19 +3,22 @@ package middleauth
 import (
 	"context"
 	"fmt"
-
-	"github.com/jinzhu/gorm"
+	"time"
 )
 
 // User object
 type User struct {
-	gorm.Model
+	ID            uint   `gorm:"primary_key"`
 	Name          string `gorm:"type:varchar(255)"`
 	PrimaryEmail  string `gorm:"type:varchar(100);unique_index"`
 	VerifiedEmail bool
 	Emails        []UserEmail
 	Password      string `gorm:"type:varchar(255)"`
 	IsAdmin       bool
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time `sql:"index"`
 }
 
 // UserEmail contains user and email relationship

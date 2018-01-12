@@ -33,7 +33,7 @@ func authJWTCookie(cookie *http.Cookie, jwtKey string, method crypto.SigningMeth
 	claims := jws.Claims{}
 	claims.Set("id", authUser.ID)
 	claims.Set("name", authUser.Name)
-	claims.SetAudience("localhost") // TODO: set audience correctly
+	claims.SetAudience(cookie.Domain)
 	claims.SetExpiration(cookie.Expires)
 
 	// encode token and store in cookies
