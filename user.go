@@ -1,7 +1,6 @@
 package middleauth
 
 import (
-	"context"
 	"fmt"
 	"time"
 )
@@ -104,12 +103,3 @@ func (err LoginError) GoString() string {
 	}
 	return "LoginError(" + err.String() + ")"
 }
-
-// UserCallback is the interface for authenticator
-// to interact with, once acquired the user information.
-//
-// It is responsible to:
-// 1. Search backend storage to see if the user already exists.
-// 2. If not, create a user entry as appropriated.
-// 3. Return a *User for cookie, or return nil with error.
-type UserCallback func(ctx context.Context, authUser User, emails []string) (confirmedUser *User, err error)

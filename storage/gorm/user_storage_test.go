@@ -27,16 +27,15 @@ func TestLoadOrCreateUser(t *testing.T) {
 		middleauth.UserEmail{},
 	)
 
-	callback := gormstorage.UserCallback(db)
+	callback := gormstorage.UserStorageCallback(db)
 
 	// attempt to create user on first login
-	u1, err := callback(
+	_, u1, err := callback(
 		context.TODO(),
-		middleauth.User{
+		&middleauth.User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy@foobar.com",
 		},
-		[]string{},
 	)
 
 	if err != nil {
@@ -60,13 +59,12 @@ func TestLoadOrCreateUser(t *testing.T) {
 
 	// should retrieve the same user on second login
 	// regardless of the name
-	u2, err := callback(
+	_, u2, err := callback(
 		context.TODO(),
-		middleauth.User{
+		&middleauth.User{
 			Name:         "dummy user another time",
 			PrimaryEmail: "dummy@foobar.com",
 		},
-		[]string{},
 	)
 	if want, have := u1.ID, u2.ID; want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
@@ -79,13 +77,12 @@ func TestLoadOrCreateUser(t *testing.T) {
 	}
 
 	// try to login with no email
-	u3, err := callback(
+	_, u3, err := callback(
 		context.TODO(),
-		middleauth.User{
+		&middleauth.User{
 			Name:         "dummy user",
 			PrimaryEmail: "",
 		},
-		[]string{},
 	)
 	if u3 != nil {
 		t.Errorf("expected u3 to be nil, got %#v", u3)
@@ -93,63 +90,6 @@ func TestLoadOrCreateUser(t *testing.T) {
 	if want, have := middleauth.ErrNoEmail, err.(*middleauth.LoginError).Type; want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
-}
-
-func TestLoadOrCreateUser_UserEmail(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-	}
-	defer db.Close()
-	db.AutoMigrate(
-		middleauth.User{},
-		middleauth.UserEmail{},
-	)
-
-	callback := gormstorage.UserCallback(db)
-
-	// attempt to create user on first login
-	u1, err := callback(
-		context.TODO(),
-		middleauth.User{
-			Name:         "dummy user",
-			PrimaryEmail: "dummy1@foobar.com",
-		},
-		[]string{"dummy2@foobar.com"},
-	)
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-	}
-	if u1 == nil {
-		t.Errorf("expected user, got nil")
-	}
-
-	u2, err := callback(
-		context.TODO(),
-		middleauth.User{
-			Name:         "dummy user",
-			PrimaryEmail: "dummy2@foobar.com",
-		},
-		[]string{},
-	)
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-	}
-	if u2 == nil {
-		t.Errorf("expected user, got nil")
-	}
-
-	// both attempts should result the same user
-	if want, have := u1.ID, u2.ID; want != have {
-		t.Errorf("expected %#v, got %#v", want, have)
-	}
-	if want, have := u1.Name, u2.Name; want != have {
-		t.Errorf("expected %#v, got %#v", want, have)
-	}
-	if want, have := u1.PrimaryEmail, u2.PrimaryEmail; want != have {
-		t.Errorf("expected %#v, got %#v", want, have)
-	}
-
 }
 
 func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
@@ -166,14 +106,13 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 		middleauth.UserEmail{},
 	)
 	db.Exec("DROP TABLE user_emails;")
-	callback := gormstorage.UserCallback(db)
-	u1, err := callback(
+	callback := gormstorage.UserStorageCallback(db)
+	_, u1, err := callback(
 		context.TODO(),
-		middleauth.User{
+		&middleauth.User{
 			Name:         "dummy user",
 			PrimaryEmail: "dummy@foobar.com",
 		},
-		[]string{},
 	)
 	if u1 != nil {
 		t.Errorf("expected u1 to be nil, got %#v", u1)
@@ -187,18 +126,13 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 		t.Errorf("expected u1db to have id=0, got %#v", u1db)
 	}
 
-	// test inserting with a duplicated ValidatedEmail
-	db.AutoMigrate(
-		middleauth.User{},
-		middleauth.UserEmail{},
-	)
-	u2, err := callback(
+	db.Exec("DROP TABLE users;")
+	_, u2, err := callback(
 		context.TODO(),
-		middleauth.User{
+		&middleauth.User{
 			Name:         "dummy user",
-			PrimaryEmail: "dummy2@foobar.com",
+			PrimaryEmail: "dummy3@foobar.com",
 		},
-		[]string{"dummy2@foobar.com"},
 	)
 	if u2 != nil {
 		t.Errorf("expected u1 to be nil, got %#v", u1)
@@ -209,28 +143,7 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 	u2db := middleauth.User{}
 	db.First(&u2db, "email = ?", "dummy@foobar.com")
 	if u2db.ID != 0 {
-		t.Errorf("expected u2db to have id=0, got %#v", u2db)
-	}
-
-	db.Exec("DROP TABLE users;")
-	u3, err := callback(
-		context.TODO(),
-		middleauth.User{
-			Name:         "dummy user",
-			PrimaryEmail: "dummy3@foobar.com",
-		},
-		[]string{},
-	)
-	if u3 != nil {
-		t.Errorf("expected u1 to be nil, got %#v", u1)
-	}
-	if err == nil {
-		t.Errorf("expected error, got nil")
-	}
-	u3db := middleauth.User{}
-	db.First(&u3db, "email = ?", "dummy@foobar.com")
-	if u3db.ID != 0 {
-		t.Errorf("expected u3db to have id=0, got %#v", u3db)
+		t.Errorf("expected u3db to have id=0, got %#v", u2db)
 	}
 
 }

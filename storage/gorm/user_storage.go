@@ -7,11 +7,11 @@ import (
 	"github.com/yookoala/middleauth"
 )
 
-// UserCallback generates implementation of middleauth.UserCallback
+// UserStorageCallback generates implementation of middleauth.UserCallback
 // with gorm backed storage.
-func UserCallback(db *gorm.DB) middleauth.UserCallback {
+func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 
-	return func(ctx context.Context, authUser middleauth.User, verifiedEmails []string) (confirmedUser *middleauth.User, err error) {
+	return func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
 
 		// search existing user with the email
 		var userEmail middleauth.UserEmail
@@ -19,7 +19,7 @@ func UserCallback(db *gorm.DB) middleauth.UserCallback {
 
 		if db.First(&prevUser, "primary_email = ?", authUser.PrimaryEmail); prevUser.PrimaryEmail != "" {
 			// TODO: log this?
-			authUser = prevUser
+			authUser = &prevUser
 		} else if db.First(&userEmail, "email = ?", authUser.PrimaryEmail); userEmail.Email != "" {
 			// TODO: log this?
 			db.First(&authUser, "id = ?", userEmail.UserID)
@@ -58,29 +58,32 @@ func UserCallback(db *gorm.DB) middleauth.UserCallback {
 			}
 
 			// also input UserEmail from verifiedEmails, if len not 0
-			for _, email := range verifiedEmails {
-				newUserEmail := middleauth.UserEmail{
-					UserID: authUser.ID,
-					Email:  email,
-				}
-				if res := tx.Create(&newUserEmail); res.Error != nil {
-					// append newUserEmail to error info
-					err = &middleauth.LoginError{
-						Type:   middleauth.ErrDatabase,
-						Action: "create user-email relation " + newUserEmail.Email,
-						Err:    res.Error,
+			/*
+				for _, email := range verifiedEmails {
+					newUserEmail := middleauth.UserEmail{
+						UserID: authUser.ID,
+						Email:  email,
 					}
-					tx.Rollback()
-					return
+					if res := tx.Create(&newUserEmail); res.Error != nil {
+						// append newUserEmail to error info
+						err = &middleauth.LoginError{
+							Type:   middleauth.ErrDatabase,
+							Action: "create user-email relation " + newUserEmail.Email,
+							Err:    res.Error,
+						}
+						tx.Rollback()
+						return
+					}
 				}
-			}
+			*/
 
 			tx.Commit()
 		}
 
 		if err == nil {
-			confirmedUser = &authUser
+			confirmedUser = authUser
 		}
+		ctxNext = ctx
 		return
 	}
 }

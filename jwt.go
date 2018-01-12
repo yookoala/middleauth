@@ -1,6 +1,7 @@
 package middleauth
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -27,6 +28,7 @@ func EncodeTokenStr(key string, claims jws.Claims, method crypto.SigningMethod) 
 	return
 }
 
+// (obsoleted, will be replaced with the new JWTSession)
 func authJWTCookie(cookie *http.Cookie, jwtKey string, method crypto.SigningMethod, authUser User) *http.Cookie {
 
 	// Create JWS claims with the user info
@@ -39,4 +41,24 @@ func authJWTCookie(cookie *http.Cookie, jwtKey string, method crypto.SigningMeth
 	// encode token and store in cookies
 	cookie.Value, _ = EncodeTokenStr(jwtKey, claims, method)
 	return cookie
+}
+
+// JWTSession produces a CookieFractory from given JWT key and signing method
+// to create a JWT based cookie
+func JWTSession(cookieName, jwtKey string, method crypto.SigningMethod) CookieFactory {
+	return func(ctx context.Context, in *http.Cookie, confirmedUser *User) (cookie *http.Cookie, err error) {
+
+		cookie = in
+
+		// Create JWS claims with the user info
+		claims := jws.Claims{}
+		claims.Set("id", confirmedUser.ID)
+		claims.Set("name", confirmedUser.Name)
+		claims.SetAudience(cookie.Domain)
+		claims.SetExpiration(cookie.Expires)
+
+		// encode token and store in cookies
+		cookie.Value, _ = EncodeTokenStr(jwtKey, claims, method)
+		return
+	}
 }
