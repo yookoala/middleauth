@@ -3,7 +3,9 @@ package middleauth
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"gopkg.in/jose.v1/crypto"
 	"gopkg.in/jose.v1/jws"
@@ -60,5 +62,19 @@ func JWTSession(cookieName, jwtKey string, method crypto.SigningMethod) CookieFa
 		// encode token and store in cookies
 		cookie.Value, _ = EncodeTokenStr(jwtKey, claims, method)
 		return
+	}
+}
+
+// SessionExpires is a middleware for CookieFactory which apply
+// an expiration period to the cookie created.
+func SessionExpires(d time.Duration) func(inner CookieFactory) CookieFactory {
+	return func(inner CookieFactory) CookieFactory {
+		return func(ctx context.Context, in *http.Cookie, confirmedUser *User) (cookie *http.Cookie, err error) {
+			log.Printf("cookie: %#v", cookie)
+			if cookie != nil {
+				cookie.Expires = time.Now().Add(d)
+			}
+			return inner(ctx, in, confirmedUser)
+		}
 	}
 }

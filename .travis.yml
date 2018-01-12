@@ -8,6 +8,7 @@ go:
 
 script:
   - ./scripts/go.test.sh
+  - go build -v ./cmd/example-server
 
 after_script:
   - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN

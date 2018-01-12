@@ -2,7 +2,9 @@ package middleauth
 
 import (
 	"context"
+	"log"
 	"net/http"
+	"text/template"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -49,6 +51,7 @@ func OAuth1aAuthURLFactory(c OAuth1aConsumer, callbackURL string, tokens TokenSt
 // authentication endpoint with proper parameters
 func RedirectHandler(getAuthURL AuthURLFactory, errURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("run redirect handler")
 		url, err := getAuthURL(r)
 		if err != nil {
 			// TODO: redirect to the errURL with status messages
@@ -143,6 +146,7 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"error": err.Error(),
 		}).Error("failed to create API client")
 		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+		return
 	}
 
 	// get info of authenticating user from API calls
@@ -152,6 +156,7 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"error": err.Error(),
 		}).Error("failed retrieve authenticating user info from OAuth2 provider")
 		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+		return
 	}
 
 	// find or create user from the given info of
@@ -162,12 +167,13 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"error": err.Error(),
 		}).Error("failed to find or create authenticating user")
 		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+		return
 	}
 
 	// log success
 	logrus.WithFields(logrus.Fields{
-		"user.id":   authUser.ID,
-		"user.name": authUser.Name,
+		"user.id":   confirmedUser.ID,
+		"user.name": confirmedUser.Name,
 	}).Info("user found or created.")
 
 	// set authUser digest to cookie as jwt
@@ -182,6 +188,7 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"error": err.Error(),
 		}).Error("failed to generate session cookie")
 		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+		return
 	}
 
 	// set the session cookie, then redirect user temporarily
@@ -215,15 +222,14 @@ func LoginHandler(
 	userStorageCallback UserStorageCallback,
 	cookieFactory CookieFactory,
 	providers []AuthProvider,
-	baseURL, oauth2Path, successPath, errPath string,
+	baseURL, oauth2Path, successURL, errURL string,
 ) http.Handler {
 
 	// Note: oauth2Path must start with "/" and must not have trailing slash
 	// Note: baseURL must be full URL without path or any trailing slash
 
 	mux := http.NewServeMux()
-	oauth2URL := baseURL + oauth2Path   // full URL to oauth2 path
-	successURL := baseURL + successPath // full URL to success page
+	oauth2URL := baseURL + oauth2Path // full URL to oauth2 path
 	tokenStore := tokenStore(make(map[string]*oauth.RequestToken, 1024))
 
 	if provider := FindProvider("google", providers); provider != nil {
@@ -232,7 +238,7 @@ func LoginHandler(
 				*provider,
 				oauth2URL+"/google/callback",
 			)),
-			errPath,
+			errURL,
 		))
 		mux.Handle(
 			oauth2Path+"/google/callback",
@@ -245,7 +251,7 @@ func LoginHandler(
 				userStorageCallback,
 				cookieFactory,
 				successURL,
-				errPath,
+				errURL,
 			),
 		)
 	}
@@ -256,7 +262,7 @@ func LoginHandler(
 				*provider,
 				oauth2URL+"/facebook/callback",
 			)),
-			errPath,
+			errURL,
 		))
 		mux.Handle(
 			oauth2Path+"/facebook/callback",
@@ -269,7 +275,7 @@ func LoginHandler(
 				userStorageCallback,
 				cookieFactory,
 				successURL,
-				errPath,
+				errURL,
 			),
 		)
 	}
@@ -280,7 +286,7 @@ func LoginHandler(
 				*provider,
 				oauth2URL+"/github/callback",
 			)),
-			errPath,
+			errURL,
 		))
 		mux.Handle(
 			oauth2Path+"/github/callback",
@@ -293,7 +299,7 @@ func LoginHandler(
 				userStorageCallback,
 				cookieFactory,
 				successURL,
-				errPath,
+				errURL,
 			),
 		)
 	}
@@ -305,7 +311,7 @@ func LoginHandler(
 				oauth2URL+"/twitter/callback",
 				tokenStore,
 			),
-			errPath,
+			errURL,
 		))
 		mux.Handle(
 			oauth2Path+"/twitter/callback",
@@ -318,10 +324,129 @@ func LoginHandler(
 				userStorageCallback,
 				cookieFactory,
 				successURL,
-				errPath,
+				errURL,
 			),
 		)
 	}
 
 	return mux
+}
+
+const loginPageDefaultCSS = `
+{{ define "defaultCSS" }}
+#page-login {
+	margin: 0;
+	font-family: san-serif;
+	background-color: #EEE;
+}
+#page-login h1 {
+	font-size: 1.3em;
+	margin: 1em 0 2em;
+	text-align: center;
+}
+
+#login-box {
+	max-width: 300px;
+	margin: calc(50vh - 250px) auto 0;
+	padding: 30px 50px;
+	box-shadow: 1px 1px 10px #999;
+	background-color: #FFF;}
+#login-box .actions .btn {
+	background-color: #444;
+	color: #FFF;
+	display: block;
+	margin: 0.5em;
+	padding: 0.5em 1em;
+	border-radius: 0.2em;
+	text-decoration: none;
+	text-align: center;
+	font-weight: bold;
+	transition: opacity 0.5s;
+}
+#login-box .actions .btn:hover {
+	opacity: 0.7;
+}
+#login-box .actions .btn-login-google {
+	background-color: #DB4437;
+}
+#login-box .actions .btn-login-facebook {
+	background-color: #3B5998;
+}
+#login-box .actions .btn-login-twitter {
+	background-color: #1DA1F2;
+}
+#login-box .actions .btn-login-github {
+	background-color: #24292E;
+}
+#login-box .no-actions .messages {
+	padding: 0.5em 1em;
+	background-color: #FDD;
+	color: #A00;
+	text-align: center;
+	border: 1px solid #A00;
+}
+{{ end }}
+`
+
+const loginPageHTML = `
+<!doctype html>
+<html>
+<head>
+<title>{{ if .PageHeaderTitle }}{{ .PageHeaderTitle }}{{ else if .PageTitle }}{{ .PageTitle }}{{ else }}Login{{ end }}</title>
+{{ range $index, $style := .Stylesheets }}
+  <link rel="stylesheet" type="text/css" href="{{ $style }}">
+{{ else }}
+<style>
+{{ template "defaultCSS" }}
+</style>
+{{ end }}
+</head>
+<body id="page-login">
+<main id="login-box">
+<h1>{{ if .PageTitle }}{{ .PageTitle }}{{ else }}Login{{ end }}</h1>
+{{ if .Actions }}
+  <div class="actions">
+    {{ range .Actions }}
+      <a class="btn btn-login-{{ .ID }}" href="{{ .Path }}">{{ .Name }}</a>
+    {{ end }}
+  </div>
+{{ else }}
+  <div class="no-actions">
+    <div class="messages">
+      <p>
+        {{ if .NoticeNoAction }}{{ .NoticeNoAction }}{{ else }}Please setup authentication provider.{{ end }}
+      </p>
+    </div>
+  </div>
+{{ end }}
+</main>
+</body>
+{{ range $index, $script := .Scripts }}
+  <script src="{{ $script }}"></script>
+{{ end }}
+</html>
+`
+
+// LoginPageContent is the contents to be filled to the login page
+type LoginPageContent struct {
+	PageTitle       string
+	PageHeaderTitle string
+	Stylesheets     []string
+	Actions         []AuthProvider
+	NoticeNoAction  string
+}
+
+// LoginPageContentCallback returns LoginPageContent for a given
+// http.Request
+type LoginPageContentCallback func(r *http.Request) LoginPageContent
+
+// LoginPageHandler returns an http.HandlerFunc for
+// a plain simple login page
+func LoginPageHandler(getContent LoginPageContentCallback) http.HandlerFunc {
+	loginTemplate := template.New("login")
+	loginTemplate = template.Must(loginTemplate.Parse(loginPageHTML))
+	loginTemplate = template.Must(loginTemplate.Parse(loginPageDefaultCSS))
+	return func(w http.ResponseWriter, r *http.Request) {
+		loginTemplate.Execute(w, getContent(r))
+	}
 }

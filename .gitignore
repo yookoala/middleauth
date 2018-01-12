@@ -4,3 +4,7 @@
 
 # ignore dotenv file
 .env
+
+# building artifacts
+/example-server
+/example-server.db
