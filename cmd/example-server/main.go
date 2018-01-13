@@ -15,34 +15,52 @@ import (
 	"gopkg.in/jose.v1/crypto"
 )
 
-func main() {
-
-	// the handlers implement http.Handler and
-	// works with any router that accept it.
-	mux := http.NewServeMux()
+func varFromEnv() (host, port, cookieName, publicURL string) {
 
 	// (optional) load variables in .env as environment variavbles
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	// some settings
-	var host, port, cookieName string
+	// hard code these 2 here
 	host, cookieName = "localhost", "middleauth-example"
+
+	// get port and public url here
 	if port = os.Getenv("PORT"); port == "" {
 		port = "8080"
 	}
+	if publicURL = os.Getenv("PUBLIC_URL"); publicURL == "" {
+		publicURL = "http://localhost:8080"
+	}
 
-	// database for test
+	return
+}
+
+func getDB() (db *gorm.DB) {
 	db, err := gorm.Open("sqlite3", "example-server.db")
 	if err != nil {
 		log.Fatalf("unexpected error: %s", err.Error())
 	}
-	defer db.Close()
+
 	db.AutoMigrate(
 		middleauth.User{},
 		middleauth.UserEmail{},
 	)
+	return
+}
+
+func main() {
+
+	// the handlers implement http.Handler and
+	// works with any router that accept it.
+	mux := http.NewServeMux()
+
+	// some settings
+	host, port, cookieName, publicURL := varFromEnv()
+
+	// database for test
+	db := getDB()
+	defer db.Close()
 
 	// overrides expiration of default JWTSession setting
 	mySession := middleauth.SessionExpires(12 * time.Hour)(
@@ -53,39 +71,25 @@ func main() {
 		),
 	)
 
-	// path to use for login authentications
-	loginBasePath := "/login/oauth2"
-
 	// get providers from environment variables
-	providers := middleauth.EnvProviders(os.Getenv, loginBasePath)
+	providers := middleauth.EnvProviders(os.Getenv)
 
-	// handle login paths, the trailing slash is needed here
-	// for mux routing
-	mux.Handle(loginBasePath+"/", middleauth.LoginHandler(
+	// handles the common paths:
+	// 1. login page
+	// 2. login redirect and callback for OAuth2 / OAuth1.0a
+	middleauth.CommonHandler(
+		mux,
+		providers,
 		gormstorage.UserStorageCallback(db),
 		mySession,
-		providers,
-		"http://"+host+":8080", loginBasePath,
-		"http://"+host+":8080"+"/success",
-		"http://"+host+":8080"+"/error",
-	))
-
-	// handle login page
-	mux.Handle("/login", middleauth.LoginPageHandler(
-		func(r *http.Request) middleauth.LoginPageContent {
-			return middleauth.LoginPageContent{
-				PageHeaderTitle: "Login | Example Server",
-				PageTitle:       "Login to Example Server",
-				Actions:         providers,
-			}
-		},
-	))
-
-	// handle logout path
-	mux.Handle("/logout", middleauth.LogoutHandler(
-		"http://"+host+":8080/logout",
 		cookieName,
-	))
+		publicURL,
+		"/login",
+		"/login/oauth2",
+		"/logout",
+		publicURL+"/success",
+		publicURL+"/error",
+	)
 
 	mux.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "error!")
