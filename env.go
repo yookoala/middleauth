@@ -7,36 +7,41 @@ import (
 
 // AuthProvider defines a login provider in details
 type AuthProvider struct {
-	ID           string
-	Name         string
-	Path         string
-	ClientID     string
+
+	// ID is the unique identifier among providers that
+	// also used in the callback path.
+	ID string
+
+	// Name is the human readable name
+	// for frontend display, such as the login page buttons.
+	Name string
+
+	// ClientID is the OAuth client ID from the provider.
+	ClientID string
+
+	// ClientID is the OAuth client secret from the provider.
 	ClientSecret string
 }
 
 // EnvProviders gets login providers from environment
-func EnvProviders(getEnv func(string) string, basePath string) (providers []AuthProvider) {
+func EnvProviders(getEnv func(string) string) (providers []AuthProvider) {
 	providers = make([]AuthProvider, 0, 4)
 	protoProviders := []AuthProvider{
 		{
 			ID:   "google",
 			Name: "Google",
-			Path: basePath + "/google",
 		},
 		{
 			ID:   "facebook",
 			Name: "Facebook",
-			Path: basePath + "/facebook",
 		},
 		{
 			ID:   "twitter",
 			Name: "Twitter",
-			Path: basePath + "/twitter",
 		},
 		{
 			ID:   "github",
 			Name: "Github",
-			Path: basePath + "/github",
 		},
 	}
 

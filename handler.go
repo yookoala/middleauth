@@ -406,8 +406,9 @@ const loginPageHTML = `
 <h1>{{ if .PageTitle }}{{ .PageTitle }}{{ else }}Login{{ end }}</h1>
 {{ if .Actions }}
   <div class="actions">
-    {{ range .Actions }}
-      <a class="btn btn-login-{{ .ID }}" href="{{ .Path }}">{{ .Name }}</a>
+	{{ $loginPath := .LoginPath }}
+    {{ range $action := .Actions }}
+      <a class="btn btn-login-{{ $action.ID }}" href="{{ $loginPath }}{{ $action.ID }}">{{ $action.Name }}</a>
     {{ end }}
   </div>
 {{ else }}
@@ -431,6 +432,7 @@ const loginPageHTML = `
 type LoginPageContent struct {
 	PageTitle       string
 	PageHeaderTitle string
+	LoginPath       string
 	Stylesheets     []string
 	Actions         []AuthProvider
 	NoticeNoAction  string
