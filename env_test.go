@@ -97,7 +97,7 @@ func TestEnvProviders(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		providers := middleauth.EnvProviders(test.getEnv, "/")
+		providers := middleauth.EnvProviders(test.getEnv)
 		providerIDs := mapProviderID(providers)
 		if err := compare(test.ids, providerIDs); err != nil {
 			t.Errorf("providerIDs missed ID: %s", err.Error())

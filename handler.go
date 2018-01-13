@@ -2,7 +2,7 @@ package middleauth
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"strings"
 	"text/template"
@@ -52,7 +52,6 @@ func OAuth1aAuthURLFactory(c OAuth1aConsumer, callbackURL string, tokens TokenSt
 // authentication endpoint with proper parameters
 func RedirectHandler(getAuthURL AuthURLFactory, errURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("run redirect handler")
 		url, err := getAuthURL(r)
 		if err != nil {
 			// TODO: redirect to the errURL with status messages
@@ -83,6 +82,44 @@ func OAuth2CallbackDecoder(conf *oauth2.Config) CallbackReqDecoder {
 			return
 		}
 		client = conf.Client(r.Context(), token)
+		return
+	}
+}
+
+// OAuth1aCallbackDecoder generates ProviderClientFactory of the given
+// consumer
+func OAuth1aCallbackDecoder(c *oauth.Consumer, tokens TokenStore) CallbackReqDecoder {
+	return func(r *http.Request) (ctxNext context.Context, client *http.Client, err error) {
+
+		values := r.URL.Query()
+		verificationCode := values.Get("oauth_verifier")
+		tokenKey := values.Get("oauth_token")
+
+		// TODO: add mutex lock mechanism to ensure read, write
+		// or have global token storage for distributed access
+		token := tokens.Consume(tokenKey)
+		if token == nil {
+			err = fmt.Errorf("relevant request token not found")
+		}
+
+		accessToken, err := c.AuthorizeToken(token, verificationCode)
+		if err != nil {
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"error": err.Error(),
+				}).Error("failed to retrieve access token")
+				return
+			}
+		}
+
+		client, err = c.MakeHttpClient(accessToken)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"error": err.Error(),
+			}).Error("error making credential client")
+			return
+		}
+
 		return
 	}
 }
@@ -231,7 +268,7 @@ func LoginHandler(
 
 	mux := http.NewServeMux()
 	loginURL := baseURL + loginPath // full URL to oauth2 path
-	tokenStore := tokenStore(make(map[string]*oauth.RequestToken, 1024))
+	tokenStore := NewTokenStore()
 
 	if provider := FindProvider("google", providers); provider != nil {
 		mux.Handle(loginPath+"google", RedirectHandler(
@@ -317,7 +354,7 @@ func LoginHandler(
 		mux.Handle(
 			loginPath+"twitter/callback",
 			NewCallbackHandler(
-				TwitterClientFactory(
+				OAuth1aCallbackDecoder(
 					TwitterConsumer(*provider),
 					tokenStore,
 				),

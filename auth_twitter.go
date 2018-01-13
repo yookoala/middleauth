@@ -2,7 +2,6 @@ package middleauth
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
@@ -15,6 +14,11 @@ import (
 type TokenStore interface {
 	Save(token *oauth.RequestToken)
 	Consume(tokenKey string) (token *oauth.RequestToken)
+}
+
+// NewTokenStore creates a simple local implementation of token store
+func NewTokenStore() TokenStore {
+	return tokenStore(make(map[string]*oauth.RequestToken, 1024))
 }
 
 // tokenStore stores OAuth1.0a request token
@@ -49,44 +53,6 @@ func TwitterConsumer(provider AuthProvider) *oauth.Consumer {
 			AccessTokenUrl:    "https://api.twitter.com/oauth/access_token",
 		},
 	)
-}
-
-// TwitterClientFactory generates ProviderClientFactory of the given
-// consumer
-func TwitterClientFactory(c *oauth.Consumer, tokens TokenStore) CallbackReqDecoder {
-	return func(r *http.Request) (ctxNext context.Context, client *http.Client, err error) {
-
-		values := r.URL.Query()
-		verificationCode := values.Get("oauth_verifier")
-		tokenKey := values.Get("oauth_token")
-
-		// TODO: add mutex lock mechanism to ensure read, write
-		// or have global token storage for distributed access
-		token := tokens.Consume(tokenKey)
-		if token == nil {
-			err = fmt.Errorf("relevant request token not found")
-		}
-
-		accessToken, err := c.AuthorizeToken(token, verificationCode)
-		if err != nil {
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"error": err.Error(),
-				}).Error("failed to retrieve access token")
-				return
-			}
-		}
-
-		client, err = c.MakeHttpClient(accessToken)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"error": err.Error(),
-			}).Error("error making credential client")
-			return
-		}
-
-		return
-	}
 }
 
 // TwitterAuthUserFactory implements ProviderAuthUserFactory
