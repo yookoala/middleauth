@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
 
@@ -222,30 +223,30 @@ func LoginHandler(
 	userStorageCallback UserStorageCallback,
 	cookieFactory CookieFactory,
 	providers []AuthProvider,
-	baseURL, oauth2Path, successURL, errURL string,
+	baseURL, loginPath, successURL, errURL string,
 ) http.Handler {
 
 	// Note: oauth2Path must start with "/" and must not have trailing slash
 	// Note: baseURL must be full URL without path or any trailing slash
 
 	mux := http.NewServeMux()
-	oauth2URL := baseURL + oauth2Path // full URL to oauth2 path
+	loginURL := baseURL + loginPath // full URL to oauth2 path
 	tokenStore := tokenStore(make(map[string]*oauth.RequestToken, 1024))
 
 	if provider := FindProvider("google", providers); provider != nil {
-		mux.Handle(oauth2Path+"/google", RedirectHandler(
+		mux.Handle(loginPath+"google", RedirectHandler(
 			OAuth2AuthURLFactory(GoogleConfig(
 				*provider,
-				oauth2URL+"/google/callback",
+				loginPath+"google/callback",
 			)),
 			errURL,
 		))
 		mux.Handle(
-			oauth2Path+"/google/callback",
+			loginPath+"google/callback",
 			NewCallbackHandler(
 				OAuth2CallbackDecoder(GoogleConfig(
 					*provider,
-					oauth2URL+"/google/callback",
+					loginURL+"/google/callback",
 				)),
 				GoogleAuthUserFactory,
 				userStorageCallback,
@@ -257,19 +258,19 @@ func LoginHandler(
 	}
 
 	if provider := FindProvider("facebook", providers); provider != nil {
-		mux.Handle(oauth2Path+"/facebook", RedirectHandler(
+		mux.Handle(loginPath+"facebook", RedirectHandler(
 			OAuth2AuthURLFactory(FacebookConfig(
 				*provider,
-				oauth2URL+"/facebook/callback",
+				loginPath+"facebook/callback",
 			)),
 			errURL,
 		))
 		mux.Handle(
-			oauth2Path+"/facebook/callback",
+			loginPath+"facebook/callback",
 			NewCallbackHandler(
 				OAuth2CallbackDecoder(FacebookConfig(
 					*provider,
-					oauth2URL+"/facebook/callback",
+					loginURL+"facebook/callback",
 				)),
 				FacebookAuthUserFactory,
 				userStorageCallback,
@@ -281,19 +282,19 @@ func LoginHandler(
 	}
 
 	if provider := FindProvider("github", providers); provider != nil {
-		mux.Handle(oauth2Path+"/github", RedirectHandler(
+		mux.Handle(loginPath+"github", RedirectHandler(
 			OAuth2AuthURLFactory(GithubConfig(
 				*provider,
-				oauth2URL+"/github/callback",
+				loginPath+"github/callback",
 			)),
 			errURL,
 		))
 		mux.Handle(
-			oauth2Path+"/github/callback",
+			loginPath+"github/callback",
 			NewCallbackHandler(
 				OAuth2CallbackDecoder(GithubConfig(
 					*provider,
-					oauth2URL+"/github/callback",
+					loginURL+"github/callback",
 				)),
 				FacebookAuthUserFactory,
 				userStorageCallback,
@@ -305,16 +306,16 @@ func LoginHandler(
 	}
 
 	if provider := FindProvider("twitter", providers); provider != nil {
-		mux.Handle(oauth2Path+"/twitter", RedirectHandler(
+		mux.Handle(loginPath+"twitter", RedirectHandler(
 			OAuth1aAuthURLFactory(
 				TwitterConsumer(*provider),
-				oauth2URL+"/twitter/callback",
+				loginPath+"twitter/callback",
 				tokenStore,
 			),
 			errURL,
 		))
 		mux.Handle(
-			oauth2Path+"/twitter/callback",
+			loginPath+"twitter/callback",
 			NewCallbackHandler(
 				TwitterClientFactory(
 					TwitterConsumer(*provider),
@@ -451,4 +452,68 @@ func LoginPageHandler(getContent LoginPageContentCallback) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		loginTemplate.Execute(w, getContent(r))
 	}
+}
+
+func ensureLeadingSlash(path string) string {
+	return "/" + strings.TrimLeft(path, "/")
+}
+
+func ensureTrailingSlash(path string) string {
+	return strings.TrimRight(path, "/") + "/"
+}
+
+// CommonHandler generates a common login / logout paths
+// handler from LoginHandler, LoginPageHandler and LogoutHandler
+func CommonHandler(
+	mux *http.ServeMux,
+	providers []AuthProvider,
+	userStorageCallback UserStorageCallback,
+	cookieFactory CookieFactory,
+	cookieName string,
+	publicBaseURL,
+	loginPagePath,
+	loginPath,
+	logoutPath,
+	successURL,
+	errURL string,
+) *http.ServeMux {
+
+	// normalize the input
+	publicBaseURL = strings.TrimRight(publicBaseURL, "/") // remove trailing slash
+	loginPagePath = ensureLeadingSlash(loginPagePath)
+	loginPath = ensureTrailingSlash(ensureLeadingSlash(loginPath))
+	logoutPath = ensureLeadingSlash(logoutPath)
+
+	// Handle login paths.
+	// Note: Trailing slash of loginPath is required for mux
+	// to correctly route all the sub-path within to the same handler.
+	mux.Handle(loginPath, LoginHandler(
+		userStorageCallback,
+		cookieFactory,
+		providers,
+		publicBaseURL,
+		loginPath,  // base path, on top of publicBaseURL, for OAuth redirect
+		successURL, // URL after login success
+		errURL,     // URL when has login error
+	))
+
+	// handle login page
+	mux.Handle(loginPagePath, LoginPageHandler(
+		func(r *http.Request) LoginPageContent {
+			return LoginPageContent{
+				PageHeaderTitle: "Login | Example Server",
+				PageTitle:       "Login to Example Server",
+				LoginPath:       loginPath,
+				Actions:         providers,
+			}
+		},
+	))
+
+	// handle logout path
+	mux.Handle(logoutPath, LogoutHandler(
+		successURL, // path after logout success
+		cookieName,
+	))
+
+	return mux
 }
