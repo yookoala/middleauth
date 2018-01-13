@@ -7,47 +7,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/joho/godotenv"
 	"github.com/yookoala/middleauth"
 	gormstorage "github.com/yookoala/middleauth/storage/gorm"
 	"gopkg.in/jose.v1/crypto"
 )
-
-func varFromEnv() (host, port, cookieName, publicURL string) {
-
-	// (optional) load variables in .env as environment variavbles
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	// hard code these 2 here
-	host, cookieName = "localhost", "middleauth-example"
-
-	// get port and public url here
-	if port = os.Getenv("PORT"); port == "" {
-		port = "8080"
-	}
-	if publicURL = os.Getenv("PUBLIC_URL"); publicURL == "" {
-		publicURL = "http://localhost:8080"
-	}
-
-	return
-}
-
-func getDB() (db *gorm.DB) {
-	db, err := gorm.Open("sqlite3", "example-server.db")
-	if err != nil {
-		log.Fatalf("unexpected error: %s", err.Error())
-	}
-
-	db.AutoMigrate(
-		middleauth.User{},
-		middleauth.UserEmail{},
-	)
-	return
-}
 
 func main() {
 
@@ -55,11 +18,10 @@ func main() {
 	// works with any router that accept it.
 	mux := http.NewServeMux()
 
-	// some settings
+	// environment details that are not important for now.
 	host, port, cookieName, publicURL := varFromEnv()
 
-	// database for test
-	db := getDB()
+	db := getDB() // gorm.db for user data storage
 	defer db.Close()
 
 	// overrides expiration of default JWTSession setting
