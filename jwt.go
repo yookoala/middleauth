@@ -3,7 +3,6 @@ package middleauth
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -53,6 +52,7 @@ func JWTSession(cookieName, jwtKey string, method crypto.SigningMethod) CookieFa
 		cookie = in
 
 		// Create JWS claims with the user info
+		// TODO: need to have middleware for claims
 		claims := jws.Claims{}
 		claims.Set("id", confirmedUser.ID)
 		claims.Set("name", confirmedUser.Name)
@@ -70,7 +70,6 @@ func JWTSession(cookieName, jwtKey string, method crypto.SigningMethod) CookieFa
 func SessionExpires(d time.Duration) func(inner CookieFactory) CookieFactory {
 	return func(inner CookieFactory) CookieFactory {
 		return func(ctx context.Context, in *http.Cookie, confirmedUser *User) (cookie *http.Cookie, err error) {
-			log.Printf("cookie: %#v", cookie)
 			if cookie != nil {
 				cookie.Expires = time.Now().Add(d)
 			}
