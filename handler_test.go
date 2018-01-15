@@ -1,7 +1,9 @@
 package middleauth_test
 
 import (
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -105,5 +107,63 @@ func TestOAuth1aAuthURLFactory(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", want, have)
 	} else if want, have := "dummy-secret", storedToken.Secret; want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
+	}
+}
+
+func TestCallbackHandler(t *testing.T) {
+
+	flags := make(map[string]bool)
+	stages := []string{"getClient", "getAuthUser", "findOrCreateUser", "genSessionCookie"}
+
+	getClient := middleauth.CallbackReqDecoder(func(r *http.Request) (ctxNext context.Context, client *http.Client, err error) {
+		ctxNext = r.Context()
+		// TODO: need mock client
+		flags["getClient"] = true
+		return
+	})
+
+	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
+		ctxNext = ctx
+		authUser = &middleauth.User{
+			ID:   1234,
+			Name: "dummy user",
+		}
+		flags["getAuthUser"] = true
+		return
+	})
+
+	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+		ctxNext = ctx
+		confirmedUser = authUser
+		flags["findOrCreateUser"] = true
+		return
+	})
+
+	genSessionCookie := middleauth.CookieFactory(func(ctx context.Context, in *http.Cookie, confirmedUser *middleauth.User) (out *http.Cookie, err error) {
+		out = &http.Cookie{
+			Name:  "hello-cookie",
+			Value: "dummy-session-cookie",
+		}
+		flags["genSessionCookie"] = true
+		return
+	})
+
+	handler := middleauth.NewCallbackHandler(
+		getClient,
+		getAuthUser,
+		findOrCreateUser,
+		genSessionCookie,
+		"http://foobar.com/success",
+		"http://foobar.com/error",
+	)
+
+	w := httptest.NewRecorder()
+	r, _ := http.NewRequest("GET", "http://foobar.com/oauth2/dummy-provider", nil)
+	handler.ServeHTTP(w, r)
+
+	for _, stage := range stages {
+		if ok, _ := flags[stage]; !ok {
+			t.Errorf("did not run %s", stage)
+		}
 	}
 }
