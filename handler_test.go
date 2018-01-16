@@ -126,8 +126,10 @@ func TestCallbackHandler(t *testing.T) {
 
 	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
 		ctxNext = ctx
+		var userID uuid.UUID
+		userID, _ = uuid.NewV4()
 		authUser = &middleauth.User{
-			ID:   uuid.NewV4().String(),
+			ID:   userID.String(),
 			Name: "dummy user",
 		}
 		flags["getAuthUser"] = true
@@ -184,8 +186,11 @@ func TestCallbackHandler_Errors(t *testing.T) {
 
 	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
 		ctxNext = ctx
+
+		var userID uuid.UUID
+		userID, _ = uuid.NewV4()
 		authUser = &middleauth.User{
-			ID:   uuid.NewV4().String(),
+			ID:   userID.String(),
 			Name: "dummy user",
 		}
 		return

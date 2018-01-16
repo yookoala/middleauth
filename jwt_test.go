@@ -122,9 +122,12 @@ func TestJWTSession(t *testing.T) {
 	jwtKey := "dummy-jwt-key"
 	method := crypto.SigningMethodHS256
 
+	var userID uuid.UUID
+	userID, _ = uuid.NewV4()
+
 	factory := middleauth.JWTSession("dummy-cookie", jwtKey, method)
 	confirmedUser := middleauth.User{
-		ID:   uuid.NewV4().String(),
+		ID:   userID.String(),
 		Name: "dummy user",
 	}
 

@@ -19,8 +19,11 @@ func TestAuthJWTCookie(t *testing.T) {
 		Domain:  "localhost",
 	}
 	jwtKey := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	var userID uuid.UUID
+	userID, _ = uuid.NewV4()
 	user := User{
-		ID:           uuid.NewV4().String(),
+		ID:           userID.String(),
 		Name:         "Hello User",
 		PrimaryEmail: "hello@foobar.com",
 	}

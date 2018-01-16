@@ -2,6 +2,7 @@ package gormstorage
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
@@ -29,7 +30,13 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 		} else {
 
 			tx := db.Begin()
-			authUser.ID = uuid.NewV4().String()
+			var userID uuid.UUID
+			userID, err = uuid.NewV4()
+			if err != nil {
+				err = fmt.Errorf("error generating userID (%s)", err.Error())
+			}
+
+			authUser.ID = userID.String()
 
 			// create user
 			if res := tx.Create(&authUser); res.Error != nil {
