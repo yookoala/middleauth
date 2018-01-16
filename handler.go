@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"text/template"
 	"time"
@@ -177,13 +178,21 @@ type CallbackHandler struct {
 // ServeHTTP implements http.Handler
 func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	// for additional parameters
+	errURL, _ := url.Parse(cbh.errURL)
+
 	// get an *http.Client for the API call
 	ctx, client, err := cbh.getClient(r)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Error("failed to create API client")
-		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+
+		q := url.Values{}
+		q.Add("message", "failed to create API client")
+		q.Add("error", err.Error())
+		errURL.RawQuery = q.Encode()
+		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -193,7 +202,12 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logrus.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Error("failed retrieve authenticating user info from OAuth2 provider")
-		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+
+		q := url.Values{}
+		q.Add("message", "failed retrieve authenticating user info from OAuth2 provider")
+		q.Add("error", err.Error())
+		errURL.RawQuery = q.Encode()
+		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -204,7 +218,12 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logrus.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Error("failed to find or create authenticating user")
-		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+
+		q := url.Values{}
+		q.Add("message", "failed to find or create authenticating user")
+		q.Add("error", err.Error())
+		errURL.RawQuery = q.Encode()
+		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -225,12 +244,19 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logrus.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Error("failed to generate session cookie")
-		http.Redirect(w, r, cbh.errURL, http.StatusTemporaryRedirect)
+
+		q := url.Values{}
+		q.Add("message", "failed to generate session cookie")
+		q.Add("error", err.Error())
+		errURL.RawQuery = q.Encode()
+		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
 	}
 
 	// set the session cookie, then redirect user temporarily
 	// temporary redirect user to success url
+	//
+	// TODO: implement custom redirect / success messages to success url
 	http.SetCookie(w, cookie)
 	http.Redirect(
 		w, r,

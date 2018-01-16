@@ -2,6 +2,7 @@ package middleauth_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -164,6 +165,130 @@ func TestCallbackHandler(t *testing.T) {
 	for _, stage := range stages {
 		if ok, _ := flags[stage]; !ok {
 			t.Errorf("did not run %s", stage)
+		}
+	}
+}
+
+func TestCallbackHandler_Errors(t *testing.T) {
+
+	getClient := middleauth.CallbackReqDecoder(func(r *http.Request) (ctxNext context.Context, client *http.Client, err error) {
+		ctxNext = r.Context()
+		// TODO: need mock client
+		return
+	})
+	getClientError := middleauth.CallbackReqDecoder(func(r *http.Request) (ctxNext context.Context, client *http.Client, err error) {
+		err = fmt.Errorf("getClient")
+		return
+	})
+
+	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
+		ctxNext = ctx
+		authUser = &middleauth.User{
+			ID:   1234,
+			Name: "dummy user",
+		}
+		return
+	})
+	getAuthUserError := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
+		ctxNext = ctx
+		err = fmt.Errorf("getAuthUser")
+		return
+	})
+
+	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+		ctxNext = ctx
+		confirmedUser = authUser
+		return
+	})
+	findOrCreateUserError := middleauth.UserStorageCallback(func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+		ctxNext = ctx
+		err = fmt.Errorf("findOrCreateUser")
+		return
+	})
+
+	genSessionCookie := middleauth.CookieFactory(func(ctx context.Context, in *http.Cookie, confirmedUser *middleauth.User) (out *http.Cookie, err error) {
+		out = &http.Cookie{
+			Name:  "hello-cookie",
+			Value: "dummy-session-cookie",
+		}
+		return
+	})
+	genSessionCookieError := middleauth.CookieFactory(func(ctx context.Context, in *http.Cookie, confirmedUser *middleauth.User) (out *http.Cookie, err error) {
+		err = fmt.Errorf("genSessionCookie")
+		return
+	})
+
+	tests := []struct {
+		Handler  http.Handler
+		ExptdErr string
+	}{
+		{
+			Handler: middleauth.NewCallbackHandler(
+				getClientError,
+				getAuthUser,
+				findOrCreateUser,
+				genSessionCookie,
+				"http://foobar.com/success",
+				"http://foobar.com/error",
+			),
+			ExptdErr: "getClient",
+		},
+		{
+			Handler: middleauth.NewCallbackHandler(
+				getClient,
+				getAuthUserError,
+				findOrCreateUser,
+				genSessionCookie,
+				"http://foobar.com/success",
+				"http://foobar.com/error",
+			),
+			ExptdErr: "getAuthUser",
+		},
+		{
+			Handler: middleauth.NewCallbackHandler(
+				getClient,
+				getAuthUser,
+				findOrCreateUserError,
+				genSessionCookie,
+				"http://foobar.com/success",
+				"http://foobar.com/error",
+			),
+			ExptdErr: "findOrCreateUser",
+		},
+		{
+			Handler: middleauth.NewCallbackHandler(
+				getClient,
+				getAuthUser,
+				findOrCreateUser,
+				genSessionCookieError,
+				"http://foobar.com/success",
+				"http://foobar.com/error",
+			),
+			ExptdErr: "genSessionCookie",
+		},
+	}
+
+	for _, test := range tests {
+		w := httptest.NewRecorder()
+		r, _ := http.NewRequest("GET", "http://foobar.com/oauth2/dummy-provider", nil)
+		test.Handler.ServeHTTP(w, r)
+
+		redirectURL := w.Header().Get("Location")
+		if redirectURL == "" {
+			t.Errorf("unexpected empty redirectURL")
+			continue
+		}
+
+		// get error message in redirectURL
+		parsed, err := url.Parse(redirectURL)
+		if err != nil {
+			t.Errorf("unexpected parse error for url: %#v, error: %s",
+				redirectURL, err.Error(),
+			)
+		} else if want, have := test.ExptdErr, parsed.Query().Get("error"); want != have {
+			t.Errorf("wanted %#v, got %#v", want, have)
+		} else if parsed.Query().Get("message") == "" {
+			t.Error("unexpected empty message field.")
 		}
 	}
 }
