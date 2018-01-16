@@ -7,10 +7,10 @@ import (
 
 // User object
 type User struct {
-	ID            string `gorm:"type:varchar(36);primary_key"`
-	Name          string `gorm:"type:varchar(255)"`
-	PrimaryEmail  string `gorm:"type:varchar(100);unique_index"`
-	VerifiedEmail bool
+	ID            string `json:"id" gorm:"type:varchar(36);primary_key"`
+	Name          string `json:"name" gorm:"type:varchar(255)"`
+	PrimaryEmail  string `json:"primary_email" gorm:"type:varchar(100);unique_index"`
+	VerifiedEmail bool   `json:"verified_email"`
 	Emails        []UserEmail
 	Password      string `gorm:"type:varchar(255)"`
 	IsAdmin       bool
@@ -22,9 +22,9 @@ type User struct {
 
 // UserEmail contains user and email relationship
 type UserEmail struct {
-	ID     string `gorm:"type:varchar(36);primary_key"`
-	UserID string `gorm:"type:varchar(36);index"`
-	Email  string `gorm:"type:varchar(100);unique_index"`
+	ID     string `json:"id" gorm:"type:varchar(36);primary_key"`
+	UserID string `json:"user_id" gorm:"type:varchar(36);index"`
+	Email  string `json:"email" gorm:"type:varchar(100);unique_index"`
 }
 
 // LoginErrorType represents the type of LoginError
