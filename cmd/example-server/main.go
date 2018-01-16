@@ -24,24 +24,23 @@ func main() {
 	db := getDB() // gorm.db for user data storage
 	defer db.Close()
 
+	jwtKey := "some-encryption-key"
+
 	// overrides expiration of default JWTSession setting
 	mySession := middleauth.SessionExpires(12 * time.Hour)(
 		middleauth.JWTSession(
 			cookieName,
-			"some-encryption-key",
+			jwtKey,
 			crypto.SigningMethodHS256,
 		),
 	)
-
-	// get providers from environment variables
-	providers := middleauth.EnvProviders(os.Getenv)
 
 	// handles the common paths:
 	// 1. login page
 	// 2. login redirect and callback for OAuth2 / OAuth1.0a
 	middleauth.CommonHandler(
 		mux,
-		providers,
+		middleauth.EnvProviders(os.Getenv),
 		gormstorage.UserStorageCallback(db),
 		mySession,
 		cookieName,
@@ -49,18 +48,33 @@ func main() {
 		"/login",
 		"/login/oauth2",
 		"/logout",
-		publicURL+"/success",
+		publicURL,
 		publicURL+"/error",
 	)
 
-	mux.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
+	// the dummy app endpoints
+	appMux := http.NewServeMux()
+	appMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		user := middleauth.GetUser(r.Context())
+		w.Header().Add("Content-Type", "text/html;charset=utf-8")
+		if user != nil {
+			fmt.Fprintf(w, `Hello <a href="mailto:%s">%s</a>. You may <a href="/logout">logout here</a>`, user.PrimaryEmail, user.Name)
+		} else {
+			fmt.Fprintf(w, `You have not login. Please <a href="/login">login here</a>.`)
+		}
+	})
+	appMux.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "error!")
 	})
-	mux.HandleFunc("/success", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "success!")
-	})
 
-	// TODO: middleware for session user retrieval
+	// middleware that decodes JWT session
+	// and get user from gorm db storage
+	app := middleauth.SessionMiddleware(
+		middleauth.JWTSessionDecoder(cookieName, jwtKey, crypto.SigningMethodHS256),
+		gormstorage.RetrieveUser(db),
+	)(appMux)
+	mux.Handle("/", app)
+
 	// TODO: example handler for success path (with session user info display)
 	// TODO: example handler for error path (with proper error message)
 

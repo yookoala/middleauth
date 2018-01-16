@@ -234,7 +234,12 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}).Info("user found or created.")
 
 	// set authUser digest to cookie as jwt
-	sessCookie := &http.Cookie{}
+	sessCookie := &http.Cookie{
+		Name:     "middleauth",
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  time.Now().Add(time.Hour), // expires in 1 hour
+	}
 	cookie, err := cbh.genSessionCookie(
 		ctx,
 		sessCookie,
@@ -286,21 +291,21 @@ func LoginHandler(
 	userStorageCallback UserStorageCallback,
 	cookieFactory CookieFactory,
 	providers []AuthProvider,
-	baseURL, loginPath, successURL, errURL string,
+	publicURL, loginPath, successURL, errURL string,
 ) http.Handler {
 
 	// Note: oauth2Path must start with "/" and must not have trailing slash
-	// Note: baseURL must be full URL without path or any trailing slash
+	// Note: publicURL must be full URL without path or any trailing slash
 
 	mux := http.NewServeMux()
-	loginURL := baseURL + loginPath // full URL to oauth2 path
+	loginURL := publicURL + loginPath // full URL to oauth2 path
 	tokenStore := NewTokenStore()
 
 	if provider := FindProvider("google", providers); provider != nil {
 		mux.Handle(loginPath+"google", RedirectHandler(
 			OAuth2AuthURLFactory(GoogleConfig(
 				*provider,
-				loginPath+"google/callback",
+				loginURL+"google/callback",
 			)),
 			errURL,
 		))
@@ -309,7 +314,7 @@ func LoginHandler(
 			NewCallbackHandler(
 				OAuth2CallbackDecoder(GoogleConfig(
 					*provider,
-					loginURL+"/google/callback",
+					loginURL+"google/callback",
 				)),
 				GoogleAuthUserFactory,
 				userStorageCallback,
@@ -324,7 +329,7 @@ func LoginHandler(
 		mux.Handle(loginPath+"facebook", RedirectHandler(
 			OAuth2AuthURLFactory(FacebookConfig(
 				*provider,
-				loginPath+"facebook/callback",
+				loginURL+"facebook/callback",
 			)),
 			errURL,
 		))
@@ -348,7 +353,7 @@ func LoginHandler(
 		mux.Handle(loginPath+"github", RedirectHandler(
 			OAuth2AuthURLFactory(GithubConfig(
 				*provider,
-				loginPath+"github/callback",
+				loginURL+"github/callback",
 			)),
 			errURL,
 		))

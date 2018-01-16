@@ -50,6 +50,7 @@ func JWTSession(cookieName, jwtKey string, method crypto.SigningMethod) CookieFa
 	return func(ctx context.Context, in *http.Cookie, confirmedUser *User) (cookie *http.Cookie, err error) {
 
 		cookie = in
+		cookie.Name = cookieName
 
 		// Create JWS claims with the user info
 		// TODO: need to have middleware for claims
@@ -70,10 +71,44 @@ func JWTSession(cookieName, jwtKey string, method crypto.SigningMethod) CookieFa
 func SessionExpires(d time.Duration) func(inner CookieFactory) CookieFactory {
 	return func(inner CookieFactory) CookieFactory {
 		return func(ctx context.Context, in *http.Cookie, confirmedUser *User) (cookie *http.Cookie, err error) {
-			if cookie != nil {
-				cookie.Expires = time.Now().Add(d)
+			if in == nil {
+				return inner(ctx, in, confirmedUser)
 			}
-			return inner(ctx, in, confirmedUser)
+			cookie = in
+			cookie.Expires = time.Now().Add(d)
+			return inner(ctx, cookie, confirmedUser)
 		}
+	}
+}
+
+// JWTSessionDecoder return a SessionDecoder that decodes a JWT cookie session
+// and return the user found.
+func JWTSessionDecoder(cookieName, jwtKey string, method crypto.SigningMethod) SessionDecoder {
+	return func(r *http.Request) (userID uint, err error) {
+
+		cookie, err := r.Cookie(cookieName)
+		if err != nil {
+			return
+		}
+
+		token, err := DecodeTokenStr(jwtKey, cookie.Value, method)
+		if err != nil {
+			err = fmt.Errorf("token reading error (%s)", err.Error())
+			return
+		}
+
+		idRaw := token.Claims().Get("id")
+		if idRaw == nil {
+			err = fmt.Errorf("invalid user id in token (id is nil)")
+			return
+		}
+
+		switch id := idRaw.(type) {
+		case float64:
+			userID = uint(id)
+		default:
+			err = fmt.Errorf("invalid user id in token (id should be number)")
+		}
+		return
 	}
 }
