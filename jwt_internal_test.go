@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
 	"gopkg.in/jose.v1/crypto"
 )
 
@@ -19,7 +20,7 @@ func TestAuthJWTCookie(t *testing.T) {
 	}
 	jwtKey := fmt.Sprintf("%d", time.Now().UnixNano())
 	user := User{
-		ID:           uint(time.Now().UnixNano()),
+		ID:           uuid.NewV4().String(),
 		Name:         "Hello User",
 		PrimaryEmail: "hello@foobar.com",
 	}
@@ -35,7 +36,7 @@ func TestAuthJWTCookie(t *testing.T) {
 
 	claims := token.Claims()
 
-	if want, have := float64(user.ID), claims.Get("id"); want != have {
+	if want, have := user.ID, claims.Get("id"); want != have {
 		t.Errorf("expected %T(%#v), got %T(%#v)", want, want, have, have)
 	}
 

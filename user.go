@@ -7,7 +7,7 @@ import (
 
 // User object
 type User struct {
-	ID            uint   `gorm:"primary_key"`
+	ID            string `gorm:"type:varchar(36);primary_key"`
 	Name          string `gorm:"type:varchar(255)"`
 	PrimaryEmail  string `gorm:"type:varchar(100);unique_index"`
 	VerifiedEmail bool
@@ -22,8 +22,8 @@ type User struct {
 
 // UserEmail contains user and email relationship
 type UserEmail struct {
-	ID     uint   `gorm:"primary_key"`
-	UserID uint   `gorm:"index"`
+	ID     string `gorm:"type:varchar(36);primary_key"`
+	UserID string `gorm:"type:varchar(36);index"`
 	Email  string `gorm:"type:varchar(100);unique_index"`
 }
 

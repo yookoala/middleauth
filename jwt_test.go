@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
 	"github.com/yookoala/middleauth"
 
 	"gopkg.in/jose.v1/crypto"
@@ -123,7 +124,7 @@ func TestJWTSession(t *testing.T) {
 
 	factory := middleauth.JWTSession("dummy-cookie", jwtKey, method)
 	confirmedUser := middleauth.User{
-		ID:   123,
+		ID:   uuid.NewV4().String(),
 		Name: "dummy user",
 	}
 
@@ -145,10 +146,10 @@ func TestJWTSession(t *testing.T) {
 		t.Errorf("unexpected error: %s", err.Error())
 	}
 	claims := token.Claims()
-	if haveRaw, ok := claims.Get("id").(float64); !ok {
+	if haveRaw, ok := claims.Get("id").(string); !ok {
 		have := claims.Get("id")
-		t.Errorf("expected number, got: %T(%#v)", have, have)
-	} else if want, have := confirmedUser.ID, uint(haveRaw); want != have {
+		t.Errorf("expected uuid string, got: %T(%#v)", have, have)
+	} else if want, have := confirmedUser.ID, haveRaw; want != have {
 		t.Errorf("expected: %#v, got: %#v", want, have)
 	}
 	if want, have := confirmedUser.Name, claims.Get("name"); want != have {

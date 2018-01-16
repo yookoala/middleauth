@@ -122,8 +122,8 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 	}
 	u1db := middleauth.User{}
 	db.First(&u1db, "email = ?", "dummy@foobar.com")
-	if u1db.ID != 0 {
-		t.Errorf("expected u1db to have id=0, got %#v", u1db)
+	if u1db.ID != "" {
+		t.Errorf("expected u1db to have empty id, got %#v", u1db)
 	}
 
 	db.Exec("DROP TABLE users;")
@@ -142,8 +142,8 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 	}
 	u2db := middleauth.User{}
 	db.First(&u2db, "email = ?", "dummy@foobar.com")
-	if u2db.ID != 0 {
-		t.Errorf("expected u3db to have id=0, got %#v", u2db)
+	if u2db.ID != "" {
+		t.Errorf("expected u3db to have empty id, got %#v", u2db)
 	}
 
 }

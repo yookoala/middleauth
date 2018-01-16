@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mrjones/oauth"
+	uuid "github.com/satori/go.uuid"
 	"github.com/yookoala/middleauth"
 	"golang.org/x/oauth2"
 )
@@ -126,7 +127,7 @@ func TestCallbackHandler(t *testing.T) {
 	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
 		ctxNext = ctx
 		authUser = &middleauth.User{
-			ID:   1234,
+			ID:   uuid.NewV4().String(),
 			Name: "dummy user",
 		}
 		flags["getAuthUser"] = true
@@ -184,7 +185,7 @@ func TestCallbackHandler_Errors(t *testing.T) {
 	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
 		ctxNext = ctx
 		authUser = &middleauth.User{
-			ID:   1234,
+			ID:   uuid.NewV4().String(),
 			Name: "dummy user",
 		}
 		return

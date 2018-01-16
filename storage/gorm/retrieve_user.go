@@ -10,7 +10,7 @@ import (
 // RetrieveUser create a middleauth.RetrieveUser implementation
 // by the given db.
 func RetrieveUser(db *gorm.DB) middleauth.RetrieveUser {
-	return func(ctx context.Context, id uint) (user *middleauth.User, err error) {
+	return func(ctx context.Context, id string) (user *middleauth.User, err error) {
 		users := []middleauth.User{}
 		db.First(&users, "id = ?", id)
 		if len(users) < 1 {

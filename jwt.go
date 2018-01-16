@@ -84,7 +84,7 @@ func SessionExpires(d time.Duration) func(inner CookieFactory) CookieFactory {
 // JWTSessionDecoder return a SessionDecoder that decodes a JWT cookie session
 // and return the user found.
 func JWTSessionDecoder(cookieName, jwtKey string, method crypto.SigningMethod) SessionDecoder {
-	return func(r *http.Request) (userID uint, err error) {
+	return func(r *http.Request) (userID string, err error) {
 
 		cookie, err := r.Cookie(cookieName)
 		if err != nil {
@@ -104,10 +104,10 @@ func JWTSessionDecoder(cookieName, jwtKey string, method crypto.SigningMethod) S
 		}
 
 		switch id := idRaw.(type) {
-		case float64:
-			userID = uint(id)
+		case string:
+			userID = id
 		default:
-			err = fmt.Errorf("invalid user id in token (id should be number)")
+			err = fmt.Errorf("invalid user id in token (id should be string)")
 		}
 		return
 	}

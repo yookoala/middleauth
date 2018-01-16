@@ -27,10 +27,10 @@ func GetUser(ctx context.Context) (user *User) {
 }
 
 // SessionDecoder decodes the request into userID
-type SessionDecoder func(r *http.Request) (userID uint, err error)
+type SessionDecoder func(r *http.Request) (userID string, err error)
 
 // RetrieveUser retrieves a user by the given user id
-type RetrieveUser func(ctx context.Context, id uint) (*User, error)
+type RetrieveUser func(ctx context.Context, id string) (*User, error)
 
 // SessionMiddleware retrieves the session user, if any, from
 // the given cookie key and storage access.
@@ -52,7 +52,7 @@ func SessionMiddleware(decodeSession SessionDecoder, retrieveUser RetrieveUser) 
 			}
 
 			// get user of the user id
-			user, err := retrieveUser(r.Context(), uint(userID))
+			user, err := retrieveUser(r.Context(), userID)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "bad request: %s", err.Error())

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jinzhu/gorm"
+	uuid "github.com/satori/go.uuid"
 	"github.com/yookoala/middleauth"
 )
 
@@ -28,6 +29,7 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 		} else {
 
 			tx := db.Begin()
+			authUser.ID = uuid.NewV4().String()
 
 			// create user
 			if res := tx.Create(&authUser); res.Error != nil {
