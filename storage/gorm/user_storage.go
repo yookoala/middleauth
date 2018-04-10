@@ -9,6 +9,15 @@ import (
 	"github.com/yookoala/middleauth"
 )
 
+// AutoMigrate automatically migrate all entities in database
+func AutoMigrate(db *gorm.DB) *gorm.DB {
+	return db.AutoMigrate(
+		middleauth.User{},
+		middleauth.UserEmail{},
+		middleauth.UserIdentity{},
+	)
+}
+
 // UserStorageCallback generates implementation of middleauth.UserCallback
 // with gorm backed storage.
 func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {

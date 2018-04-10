@@ -128,7 +128,7 @@ func OAuth1aCallbackDecoder(c *oauth.Consumer, tokens TokenStore) CallbackReqDec
 // AuthUserDecoder is responsible to use the given
 // context and http Client to make API calls and get
 // information about the authenticating user.
-type AuthUserDecoder func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *User, err error)
+type AuthUserDecoder func(ctx context.Context, client *http.Client) (ctxNext context.Context, authIdentity *UserIdentity, err error)
 
 // UserStorageCallback is responsible to take the given authenticating
 // user information, and
@@ -197,7 +197,7 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get info of authenticating user from API calls
-	ctx, authUser, err := cbh.getAuthUser(ctx, client)
+	ctx, authIdentity, err := cbh.getAuthUser(ctx, client)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"error": err.Error(),
@@ -209,6 +209,11 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		errURL.RawQuery = q.Encode()
 		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
+	}
+
+	authUser := &User{
+		Name:         authIdentity.Name,
+		PrimaryEmail: authIdentity.PrimaryEmail,
 	}
 
 	// find or create user from the given info of

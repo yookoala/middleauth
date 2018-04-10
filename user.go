@@ -22,9 +22,22 @@ type User struct {
 
 // UserEmail contains user and email relationship
 type UserEmail struct {
-	ID     string `json:"id" gorm:"type:varchar(36);primary_key"`
-	UserID string `json:"user_id" gorm:"type:varchar(36);index"`
-	Email  string `json:"email" gorm:"type:varchar(100);unique_index"`
+	ID       string `json:"id" gorm:"type:varchar(36);primary_key"`
+	UserID   string `json:"user_id" gorm:"type:varchar(36);index"`
+	Email    string `json:"email" gorm:"type:varchar(100);unique_index"`
+	Verified bool   `json:"verified"`
+}
+
+// UserIdentity stores OAuth2 vendor identity for a user
+type UserIdentity struct {
+	UserID       string   `json:"user_id" gorm:"type:varchar(36);index"`
+	Name         string   `json:"name" gorm:"type:varchar(255)"`
+	Type         string   `json:"type" gorm:"type:varchar(255)"`
+	Provider     string   `json:"provider" gorm:"type:varchar(255);primary_key"`
+	ProviderID   string   `json:"provider_id" gorm:"type:varchar(255);primary_key"`
+	Verified     bool     `json:"verified"`
+	PrimaryEmail string   `json:"primary_email" gorm:"type:varchar(255)"`
+	Emails       []string `json:"-" gorm:"-"` // only to reference in account creation
 }
 
 // LoginErrorType represents the type of LoginError

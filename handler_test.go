@@ -124,21 +124,25 @@ func TestCallbackHandler(t *testing.T) {
 		return
 	})
 
-	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
+	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.UserIdentity, err error) {
+		var ID uuid.UUID
+		ID, _ = uuid.NewV4()
 		ctxNext = ctx
-		var userID uuid.UUID
-		userID, _ = uuid.NewV4()
-		authUser = &middleauth.User{
-			ID:   userID.String(),
-			Name: "dummy user",
+		authUser = &middleauth.UserIdentity{
+			Name:       "dummy user",
+			Provider:   "dummy provider",
+			ProviderID: ID.String(),
 		}
 		flags["getAuthUser"] = true
 		return
 	})
 
 	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+		var ID uuid.UUID
+		ID, _ = uuid.NewV4()
 		ctxNext = ctx
 		confirmedUser = authUser
+		confirmedUser.ID = ID.String()
 		flags["findOrCreateUser"] = true
 		return
 	})
@@ -184,18 +188,19 @@ func TestCallbackHandler_Errors(t *testing.T) {
 		return
 	})
 
-	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
+	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.UserIdentity, err error) {
 		ctxNext = ctx
 
-		var userID uuid.UUID
-		userID, _ = uuid.NewV4()
-		authUser = &middleauth.User{
-			ID:   userID.String(),
-			Name: "dummy user",
+		var ID uuid.UUID
+		ID, _ = uuid.NewV4()
+		authUser = &middleauth.UserIdentity{
+			Name:       "dummy user",
+			Provider:   "dummy provider",
+			ProviderID: ID.String(),
 		}
 		return
 	})
-	getAuthUserError := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.User, err error) {
+	getAuthUserError := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.UserIdentity, err error) {
 		ctxNext = ctx
 		err = fmt.Errorf("getAuthUser")
 		return

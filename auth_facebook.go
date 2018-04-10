@@ -25,7 +25,7 @@ func FacebookConfig(provider AuthProvider, redirectURL string) *oauth2.Config {
 }
 
 // FacebookAuthUserFactory implements ProviderAuthUserFactory
-func FacebookAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *User, err error) {
+func FacebookAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authIdentity *UserIdentity, err error) {
 
 	resp, err := client.Get("https://graph.facebook.com/v2.9/me?fields=id,name,email")
 	if err != nil {
@@ -46,9 +46,12 @@ func FacebookAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext 
 		  "email": "email address"
 		}
 	*/
-	authUser = &User{
+	authIdentity = &UserIdentity{
 		Name:         result.Get("name").String(),
 		PrimaryEmail: result.Get("email").String(),
+		Type:         "oauth2",
+		Provider:     "facebook",
+		ProviderID:   result.Get("id").String(),
 	}
 	ctxNext = ctx
 	return

@@ -22,10 +22,7 @@ func TestLoadOrCreateUser(t *testing.T) {
 		t.Errorf("unexpected error: %s", err.Error())
 	}
 	defer db.Close()
-	db.AutoMigrate(
-		middleauth.User{},
-		middleauth.UserEmail{},
-	)
+	gormstorage.AutoMigrate(db)
 
 	callback := gormstorage.UserStorageCallback(db)
 
@@ -101,10 +98,7 @@ func TestLoadOrCreateUser_DatabaseError(t *testing.T) {
 	db.SetLogger(gorm.Logger{LogWriter: NopLogwriter(0)})
 
 	// test inserting with a missing table
-	db.AutoMigrate(
-		middleauth.User{},
-		middleauth.UserEmail{},
-	)
+	gormstorage.AutoMigrate(db)
 	db.Exec("DROP TABLE user_emails;")
 	callback := gormstorage.UserStorageCallback(db)
 	_, u1, err := callback(

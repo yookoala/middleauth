@@ -2,6 +2,7 @@ package middleauth
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -26,7 +27,7 @@ func GithubConfig(provider AuthProvider, redirectURL string) *oauth2.Config {
 }
 
 // GithubAuthUserFactory implements ProviderAuthUserFactory
-func GithubAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *User, err error) {
+func GithubAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authIdentity *UserIdentity, err error) {
 
 	// read into
 	var primaryEmail string
@@ -131,9 +132,13 @@ func GithubAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext co
 		}).Error("error reading results from github's user/emails endpoint")
 	}
 
-	authUser = &User{
+	authIdentity = &UserIdentity{
 		Name:         userInfoResult.Get("name").String(),
 		PrimaryEmail: primaryEmail,
+		Type:         "oauth2",
+		Provider:     "github",
+		ProviderID:   fmt.Sprintf("%d", userInfoResult.Get("id").Int()),
+		Emails:       verifiedEmails,
 	}
 	ctxNext = ctx
 	return

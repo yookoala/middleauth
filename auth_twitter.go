@@ -56,7 +56,7 @@ func TwitterConsumer(provider AuthProvider) *oauth.Consumer {
 }
 
 // TwitterAuthUserFactory implements ProviderAuthUserFactory
-func TwitterAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *User, err error) {
+func TwitterAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authIdentity *UserIdentity, err error) {
 	resp, err := client.Get(
 		"https://api.twitter.com/1.1/account/verify_credentials.json?include_email=true&skip_status")
 	if err != nil {
@@ -116,9 +116,12 @@ func TwitterAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext c
 
 	// TODO: detect read  / decode error
 	// TODO: check if the email has been verified or not
-	authUser = &User{
+	authIdentity = &UserIdentity{
 		Name:         result.Get("name").String(),
 		PrimaryEmail: result.Get("email").String(),
+		Type:         "oauth1.0a",
+		Provider:     "twitter",
+		ProviderID:   result.Get("id_str").String(),
 	}
 	ctxNext = ctx
 	return

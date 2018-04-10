@@ -26,7 +26,7 @@ func GoogleConfig(provider AuthProvider, redirectURL string) *oauth2.Config {
 }
 
 // GoogleAuthUserFactory implements ProviderAuthUserFactory
-func GoogleAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *User, err error) {
+func GoogleAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext context.Context, authIdentity *UserIdentity, err error) {
 
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v1/userinfo")
 	if err != nil {
@@ -47,9 +47,12 @@ func GoogleAuthUserFactory(ctx context.Context, client *http.Client) (ctxNext co
 		  "email": "email address"
 		}
 	*/
-	authUser = &User{
+	authIdentity = &UserIdentity{
 		Name:         result.Get("name").String(),
 		PrimaryEmail: result.Get("email").String(),
+		Type:         "oauth2",
+		Provider:     "google",
+		ProviderID:   result.Get("id").String(),
 	}
 	ctxNext = ctx
 	return
