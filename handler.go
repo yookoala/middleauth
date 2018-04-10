@@ -364,7 +364,7 @@ func LoginHandler(
 					*provider,
 					loginURL+"github/callback",
 				)),
-				FacebookAuthUserFactory,
+				GithubAuthUserFactory,
 				userStorageCallback,
 				cookieFactory,
 				successURL,
