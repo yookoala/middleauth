@@ -136,7 +136,7 @@ type AuthUserDecoder func(ctx context.Context, client *http.Client) (ctxNext con
 // 1. Search backend storage to see if the user already exists.
 // 2. If not, create a user entry as appropriated.
 // 3. Return a *User for cookie, or return nil with error.
-type UserStorageCallback func(ctx context.Context, authUser *User) (ctxNext context.Context, confirmedUser *User, err error)
+type UserStorageCallback func(ctx context.Context, authIdentity *UserIdentity) (ctxNext context.Context, confirmedUser *User, err error)
 
 // CookieFactory process the given authentication information
 // into some kind of session storage made available with cookies.
@@ -211,14 +211,9 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authUser := &User{
-		Name:         authIdentity.Name,
-		PrimaryEmail: authIdentity.PrimaryEmail,
-	}
-
 	// find or create user from the given info of
 	// authenticating user
-	ctx, confirmedUser, err := cbh.findOrCreateUser(ctx, authUser)
+	ctx, confirmedUser, err := cbh.findOrCreateUser(ctx, authIdentity)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"error": err.Error(),

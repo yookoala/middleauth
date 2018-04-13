@@ -8,3 +8,6 @@
 # building artifacts
 /example-server
 /example-server.db
+
+# vscode settings
+/.vscode

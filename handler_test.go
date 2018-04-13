@@ -137,12 +137,15 @@ func TestCallbackHandler(t *testing.T) {
 		return
 	})
 
-	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authIdentity *middleauth.UserIdentity) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
 		var ID uuid.UUID
 		ID, _ = uuid.NewV4()
 		ctxNext = ctx
-		confirmedUser = authUser
-		confirmedUser.ID = ID.String()
+		confirmedUser = &middleauth.User{
+			ID:           ID.String(),
+			Name:         authIdentity.Name,
+			PrimaryEmail: authIdentity.PrimaryEmail,
+		}
 		flags["findOrCreateUser"] = true
 		return
 	})
@@ -206,12 +209,15 @@ func TestCallbackHandler_Errors(t *testing.T) {
 		return
 	})
 
-	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authIdentity *middleauth.UserIdentity) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
 		ctxNext = ctx
-		confirmedUser = authUser
+		confirmedUser = &middleauth.User{
+			Name:         authIdentity.Name,
+			PrimaryEmail: authIdentity.PrimaryEmail,
+		}
 		return
 	})
-	findOrCreateUserError := middleauth.UserStorageCallback(func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+	findOrCreateUserError := middleauth.UserStorageCallback(func(ctx context.Context, authIdentity *middleauth.UserIdentity) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
 		ctxNext = ctx
 		err = fmt.Errorf("findOrCreateUser")
 		return

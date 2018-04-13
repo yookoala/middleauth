@@ -7,13 +7,13 @@ import (
 
 // User object
 type User struct {
-	ID            string `json:"id" gorm:"type:varchar(36);primary_key"`
-	Name          string `json:"name" gorm:"type:varchar(255)"`
-	PrimaryEmail  string `json:"primary_email" gorm:"type:varchar(100);unique_index"`
-	VerifiedEmail bool   `json:"verified_email"`
-	Emails        []UserEmail
-	Password      string `gorm:"type:varchar(255)"`
-	IsAdmin       bool
+	ID           string `json:"id" gorm:"type:varchar(36);primary_key"`
+	Name         string `json:"name" gorm:"type:varchar(255)"`
+	PrimaryEmail string `json:"primary_email" gorm:"type:varchar(100);unique_index"`
+	Verified     bool   `json:"verified"` // if the primary email is verified
+	Emails       []UserEmail
+	Password     string `gorm:"type:varchar(255)"`
+	IsAdmin      bool
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -51,10 +51,20 @@ func (err LoginErrorType) Error() string {
 // String implements Stringer interface
 func (err LoginErrorType) String() string {
 	switch err {
-	case ErrNoEmail:
-		return "no email"
 	case ErrDatabase:
 		return "database error"
+	case ErrUserNotFound:
+		return "user not found"
+	case ErrNoEmail:
+		return "no email"
+	case ErrNoProvider:
+		return "no provider"
+	case ErrNoProviderID:
+		return "no provider id"
+	case ErrUserEmailNotVerified:
+		return "user primary email is not verified"
+	case ErrUserIdentityNotVerified:
+		return "identity is not verified"
 	}
 	return "unknown error"
 }
@@ -68,11 +78,33 @@ const (
 	// ErrUnknown represents all unknown errors
 	ErrUnknown LoginErrorType = iota
 
-	// ErrNoEmail happens if the login user did not provide email
-	ErrNoEmail
-
 	// ErrDatabase represents database server errors
 	ErrDatabase
+
+	// ErrUserNotFound happens if the user of the given
+	// login identity is deleted.
+	ErrUserNotFound
+
+	// ErrNoEmail happens if the UserIdentity decoded
+	// has no primary email
+	ErrNoEmail
+
+	// ErrNoProvider happens if the UserIdentity decoded
+	// has no provider defined
+	ErrNoProvider
+
+	// ErrNoProviderID happens if the UserIdentity decoded
+	// has no provider id defined
+	ErrNoProviderID
+
+	// ErrUserEmailNotVerified happens if the login user is login
+	// but his PrimaryEmail is not verified.
+	ErrUserEmailNotVerified
+
+	// ErrUserIdentityNotVerified happens if the login user is login
+	// with OAuth2 provider but has not yet verified
+	// the linking through primary e-mail.
+	ErrUserIdentityNotVerified
 )
 
 // LoginError is a class of errors occurs in login
@@ -84,6 +116,10 @@ type LoginError struct {
 
 	// Err stores inner error type, if any
 	Err error
+
+	// User references the user, if any
+	// for the error
+	User *User
 }
 
 // Error implements error interface

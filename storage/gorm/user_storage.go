@@ -22,86 +22,198 @@ func AutoMigrate(db *gorm.DB) *gorm.DB {
 // with gorm backed storage.
 func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 
-	return func(ctx context.Context, authUser *middleauth.User) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+	return func(ctx context.Context, authIdentity *middleauth.UserIdentity) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
+
+		ctxNext = ctx // default passing
 
 		// search existing user with the email
-		var userEmail middleauth.UserEmail
 		var prevUser middleauth.User
+		var prevIdentity middleauth.UserIdentity
 
-		if db.First(&prevUser, "primary_email = ?", authUser.PrimaryEmail); prevUser.PrimaryEmail != "" {
-			// TODO: log this?
-			authUser = &prevUser
-		} else if db.First(&userEmail, "email = ?", authUser.PrimaryEmail); userEmail.Email != "" {
-			// TODO: log this?
-			db.First(&authUser, "id = ?", userEmail.UserID)
-		} else if authUser.PrimaryEmail == "" {
+		if authIdentity.PrimaryEmail == "" {
 			err = &middleauth.LoginError{Type: middleauth.ErrNoEmail}
-		} else {
+			return
+		}
+		if authIdentity.Provider == "" {
+			err = &middleauth.LoginError{Type: middleauth.ErrNoProvider}
+			return
+		}
+		if authIdentity.ProviderID == "" {
+			err = &middleauth.LoginError{Type: middleauth.ErrNoProviderID}
+			return
+		}
 
-			tx := db.Begin()
-			var userID uuid.UUID
-			userID, err = uuid.NewV4()
-			if err != nil {
-				err = fmt.Errorf("error generating userID (%s)", err.Error())
-			}
+		//
+		// A. if your identity (provider, provider_id) is found in database
+		//
+		if db.First(&prevIdentity, "provider = ? and provider_id = ?", authIdentity.Provider, authIdentity.ProviderID); prevIdentity.UserID != "" {
 
-			authUser.ID = userID.String()
-
-			// create user
-			if res := tx.Create(&authUser); res.Error != nil {
-				// append authUser to error info
+			// if user not found, return error
+			if db.First(&prevUser, "id = ?", authIdentity.UserID); prevUser.ID == "" {
 				err = &middleauth.LoginError{
-					Type:   middleauth.ErrDatabase,
-					Action: "create user",
-					Err:    res.Error,
+					Type: middleauth.ErrUserNotFound,
+					Action: fmt.Sprintf(
+						"find user (id=%s) for identity (provider=%s, provider_id=%s)",
+						authIdentity.UserID,
+						authIdentity.Provider,
+						authIdentity.ProviderID,
+					),
+					Err: fmt.Errorf("User of the identity not found. Probably deleted."),
 				}
-				tx.Rollback()
 				return
 			}
 
-			// create user-email relation
-			newUserEmail := middleauth.UserEmail{
-				UserID: authUser.ID,
-				Email:  authUser.PrimaryEmail,
-			}
-			if res := tx.Create(&newUserEmail); res.Error != nil {
-				// append newUserEmail to error info
+			// if user found but is not verified
+			if !prevUser.Verified {
 				err = &middleauth.LoginError{
-					Type:   middleauth.ErrDatabase,
-					Action: "create user-email relation " + newUserEmail.Email,
-					Err:    res.Error,
+					Type: middleauth.ErrUserEmailNotVerified,
+					Action: fmt.Sprintf(
+						"login user (id = %s) for identity (provider = %s, provider_id = %s)",
+						authIdentity.UserID,
+						authIdentity.Provider,
+						authIdentity.ProviderID,
+					),
+					User: &prevUser,
 				}
-				tx.Rollback()
 				return
 			}
 
-			// also input UserEmail from verifiedEmails, if len not 0
-			/*
-				for _, email := range verifiedEmails {
-					newUserEmail := middleauth.UserEmail{
-						UserID: authUser.ID,
-						Email:  email,
-					}
-					if res := tx.Create(&newUserEmail); res.Error != nil {
-						// append newUserEmail to error info
-						err = &middleauth.LoginError{
-							Type:   middleauth.ErrDatabase,
-							Action: "create user-email relation " + newUserEmail.Email,
-							Err:    res.Error,
-						}
-						tx.Rollback()
-						return
-					}
+			// if email is not verified
+			if !prevIdentity.Verified {
+				err = &middleauth.LoginError{
+					Type: middleauth.ErrUserIdentityNotVerified,
+					Action: fmt.Sprintf(
+						"login user (id = %s) for identity (provider = %s, provider_id = %s)",
+						authIdentity.UserID,
+						authIdentity.Provider,
+						authIdentity.ProviderID,
+					),
+					User: &prevUser,
 				}
-			*/
+				return
+			}
 
-			tx.Commit()
+			// no issue found, use the prevUser as confirmedUser
+			confirmedUser = &prevUser
+			return
+
 		}
 
-		if err == nil {
-			confirmedUser = authUser
+		//
+		// B. if the identity (provider, provider_id) is not found in the database
+		// but the primary email matches another user
+		//
+		if db.First(&prevUser, "primary_email = ?", authIdentity.PrimaryEmail); prevUser.PrimaryEmail != "" {
+
+			// add identity to database
+			authIdentity.UserID = prevUser.ID
+			if res := db.Create(&authIdentity); res.Error != nil {
+				// append UserIdentity to error info
+				err = &middleauth.LoginError{
+					Type: middleauth.ErrDatabase,
+					Action: fmt.Sprintf(
+						"create user-identity relation Provider=%s ProviderID=%s",
+						authIdentity.Provider,
+						authIdentity.ProviderID,
+					),
+					Err: res.Error,
+				}
+				return
+			}
+
+			// if authIdentity is not verified
+			if !authIdentity.Verified {
+				err = &middleauth.LoginError{
+					Type: middleauth.ErrUserIdentityNotVerified,
+					Action: fmt.Sprintf(
+						"login user (id = %s) for identity (provider = %s, provider_id = %s)",
+						authIdentity.UserID,
+						authIdentity.Provider,
+						authIdentity.ProviderID,
+					),
+					User: &prevUser,
+				}
+				return
+			}
+
+			// no issue found, use the prevUser as confirmedUser
+			confirmedUser = &prevUser
+			return
 		}
-		ctxNext = ctx
+
+		//
+		// C. handler new users
+		//
+
+		// generate random UUID as the ID of new User
+		var userID uuid.UUID
+		userID, err = uuid.NewV4()
+		if err != nil {
+			err = fmt.Errorf("error generating userID (%s)", err.Error())
+			return
+		}
+		newUser := middleauth.User{
+			ID:           userID.String(),
+			Name:         authIdentity.Name,
+			PrimaryEmail: authIdentity.PrimaryEmail,
+			Verified:     authIdentity.Verified,
+		}
+
+		// begin transaction to create new user
+		tx := db.Begin()
+
+		// create user
+		if res := tx.Create(&newUser); res.Error != nil {
+			// append newUser to error info
+			err = &middleauth.LoginError{
+				Type:   middleauth.ErrDatabase,
+				Action: "create user",
+				Err:    res.Error,
+			}
+			tx.Rollback()
+			return
+		}
+
+		// add identity to database
+		authIdentity.UserID = newUser.ID
+		if res := tx.Create(&authIdentity); res.Error != nil {
+			// append UserIdentity to error info
+			err = &middleauth.LoginError{
+				Type: middleauth.ErrDatabase,
+				Action: fmt.Sprintf(
+					"create user-identity relation Provider=%s ProviderID=%s",
+					authIdentity.Provider,
+					authIdentity.ProviderID,
+				),
+				Err: res.Error,
+			}
+			tx.Rollback()
+			return
+		}
+
+		// create user-email relation
+		newUserEmail := middleauth.UserEmail{
+			UserID: newUser.ID,
+			Email:  newUser.PrimaryEmail,
+		}
+		if res := tx.Create(&newUserEmail); res.Error != nil {
+			// append newUserEmail to error info
+			err = &middleauth.LoginError{
+				Type: middleauth.ErrDatabase,
+				Action: fmt.Sprintf(
+					"create user-email relation (user_id=%s email=%s)",
+					newUser.ID,
+					newUserEmail.Email,
+				),
+				Err: res.Error,
+			}
+			tx.Rollback()
+			return
+		}
+
+		// commit change and return new user
+		tx.Commit()
+		confirmedUser = &newUser
 		return
 	}
 }
