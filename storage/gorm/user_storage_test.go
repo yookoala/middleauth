@@ -80,6 +80,9 @@ func TestLoadOrCreateUser_normalFlow(t *testing.T) {
 	if want, have := u1.PrimaryEmail, u1db.PrimaryEmail; want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
+	if want, have := false, u1db.Verified; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
 
 	// attempt to login with another provider
 	//
@@ -211,6 +214,79 @@ func TestLoadOrCreateUser_normalFlow(t *testing.T) {
 			t.Errorf("expected %#v, got %#v", want, have)
 		}
 	}
+}
+
+func TestLoadOrCreateUser_autoVerifyFlow(t *testing.T) {
+	db, err := gorm.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+	}
+	defer db.Close()
+	gormstorage.AutoMigrate(db)
+
+	callback := gormstorage.UserStorageCallback(db)
+
+	// attempt to create user on first login
+	// with provider 1
+	identity1 := middleauth.UserIdentity{
+		Name:         "dummy user",
+		PrimaryEmail: "dummy@foobar.com",
+		Provider:     "dummy-provider-1",
+		ProviderID:   randID(),
+		Verified:     true, // login with Verified hard code to true
+	}
+	// should create a user with Verified set to false
+	// (following identity1)
+	//
+	// also identity1.UserID will be set properly
+	_, u1, err := callback(
+		context.TODO(),
+		&identity1,
+	)
+
+	u1db := middleauth.User{}
+	db.First(&u1db, "id = ?", u1.ID)
+	if want, have := u1.ID, u1db.ID; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+	if want, have := u1.Name, u1db.Name; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+	if want, have := u1.PrimaryEmail, u1db.PrimaryEmail; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+	if want, have := true, u1db.Verified; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+
+	// attempt to login with another provider
+	//
+	// should retrieve the same user on second login
+	// regardless of the name
+	identity2 := middleauth.UserIdentity{
+		Name:         "dummy user another time",
+		PrimaryEmail: "dummy@foobar.com",
+		Provider:     "dummy-provider-2",
+		ProviderID:   randID(),
+		Verified:     true,
+	}
+	_, u2, err := callback(
+		context.TODO(),
+		&identity2,
+	)
+	if want, have := u1.ID, u2.ID; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+	if want, have := u1.Name, u2.Name; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+	if want, have := u1.PrimaryEmail, u2.PrimaryEmail; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+	if want, have := true, u2.Verified; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+
 }
 
 func TestLoadOrCreateUser_userDeleted(t *testing.T) {
