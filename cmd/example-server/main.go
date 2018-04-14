@@ -38,18 +38,22 @@ func main() {
 	// handles the common paths:
 	// 1. login page
 	// 2. login redirect and callback for OAuth2 / OAuth1.0a
+	handlerCtx, err := middleauth.NewContext(publicURL)
+	if err != nil {
+		panic(err)
+	}
+
+	handlerCtx.AuthPath = "/login"
+	handlerCtx.LoginPath = "/login/oauth2"
+	handlerCtx.LogoutPath = "/logout"
+	handlerCtx.SuccessPath = ""
+	handlerCtx.ErrPath = "/error"
 	middleauth.CommonHandler(
 		mux,
 		middleauth.EnvProviders(os.Getenv),
 		gormstorage.UserStorageCallback(db),
 		mySession,
-		cookieName,
-		publicURL,
-		"/login",
-		"/login/oauth2",
-		"/logout",
-		publicURL,
-		publicURL+"/error",
+		handlerCtx,
 	)
 
 	// the dummy app endpoints

@@ -14,6 +14,150 @@ import (
 	"golang.org/x/oauth2"
 )
 
+func TestContext_urlMethods(t *testing.T) {
+
+	var ctx *middleauth.Context
+	var err error
+
+	methods := []struct {
+		name    string
+		setPath func(*middleauth.Context, string)
+		call    func(ctx *middleauth.Context) string
+	}{
+		{
+			name: "AuthURL",
+			setPath: func(ctx *middleauth.Context, value string) {
+				ctx.AuthPath = value
+			},
+			call: func(ctx *middleauth.Context) string {
+				return ctx.AuthURL().String()
+			},
+		},
+		{
+			name: "TokenURL",
+			setPath: func(ctx *middleauth.Context, value string) {
+				ctx.TokenPath = value
+			},
+			call: func(ctx *middleauth.Context) string {
+				return ctx.TokenURL().String()
+			},
+		},
+		{
+			name: "LoginURL",
+			setPath: func(ctx *middleauth.Context, value string) {
+				ctx.LoginPath = value
+			},
+			call: func(ctx *middleauth.Context) string {
+				return ctx.LoginURL().String()
+			},
+		},
+		{
+			name: "LoginURL",
+			setPath: func(ctx *middleauth.Context, value string) {
+				ctx.LoginPath = value
+			},
+			call: func(ctx *middleauth.Context) string {
+				return ctx.LoginURL().String()
+			},
+		},
+		{
+			name: "LogoutURL",
+			setPath: func(ctx *middleauth.Context, value string) {
+				ctx.LogoutPath = value
+			},
+			call: func(ctx *middleauth.Context) string {
+				return ctx.LogoutURL().String()
+			},
+		},
+		{
+			name: "SuccessURL",
+			setPath: func(ctx *middleauth.Context, value string) {
+				ctx.SuccessPath = value
+			},
+			call: func(ctx *middleauth.Context) string {
+				return ctx.SuccessURL().String()
+			},
+		},
+		{
+			name: "ErrURL",
+			setPath: func(ctx *middleauth.Context, value string) {
+				ctx.ErrPath = value
+			},
+			call: func(ctx *middleauth.Context) string {
+				return ctx.ErrURL().String()
+			},
+		},
+	}
+
+	tests := []struct {
+		desc      string
+		publicURL string
+		path      string
+		expected  string
+	}{
+		{
+			desc:      "publicURL without suffix slash",
+			publicURL: "https://foobar.com/hello",
+			path:      "world/foo/bar",
+			expected:  "https://foobar.com/hello/world/foo/bar",
+		},
+		{
+			desc:      "publicURL with suffix slash",
+			publicURL: "https://foobar.com/hello/",
+			path:      "world/foo/bar",
+			expected:  "https://foobar.com/hello/world/foo/bar",
+		},
+		{
+			desc:      "publicURL with suffix slash and path with prefix slash",
+			publicURL: "https://foobar.com/hello/",
+			path:      "/world/foo/bar",
+			expected:  "https://foobar.com/hello/world/foo/bar",
+		},
+	}
+
+	for _, method := range methods {
+		for _, test := range tests {
+
+			// initialize context
+			ctx, err = middleauth.NewContext(test.publicURL)
+			if err != nil {
+				t.Errorf(
+					"[%s, %s]\nunexpected error: %s",
+					method.name,
+					test.desc,
+					err,
+				)
+			}
+
+			initialPath := ctx.PublicURL.Path
+
+			// call the method and examine result
+			method.setPath(ctx, test.path)
+			result := method.call(ctx)
+			if want, have := test.expected, result; want != have {
+				t.Errorf(
+					"[%s, %s]\nexpect %#v, got %#v",
+					method.name,
+					test.desc,
+					want,
+					have,
+				)
+			}
+
+			// should be the same as beginning
+			if want, have := initialPath, ctx.PublicURL.Path; want != have {
+				t.Errorf(
+					"[%s, %s]\nexpected %#v, got %#v",
+					method.name,
+					test.desc,
+					want,
+					have,
+				)
+			}
+		}
+	}
+}
+
 func TestOAuth2AuthURLFactory(t *testing.T) {
 
 	factory := middleauth.OAuth2AuthURLFactory(&oauth2.Config{
@@ -159,13 +303,15 @@ func TestCallbackHandler(t *testing.T) {
 		return
 	})
 
+	ctx, _ := middleauth.NewContext("http://foobar.com/")
+	ctx.SuccessPath = "success"
+	ctx.ErrPath = "error"
 	handler := middleauth.NewCallbackHandler(
 		getClient,
 		getAuthUser,
 		findOrCreateUser,
 		genSessionCookie,
-		"http://foobar.com/success",
-		"http://foobar.com/error",
+		ctx,
 	)
 
 	w := httptest.NewRecorder()
@@ -235,6 +381,10 @@ func TestCallbackHandler_Errors(t *testing.T) {
 		return
 	})
 
+	ctx, _ := middleauth.NewContext("http://foobar.com/")
+	ctx.SuccessPath = "success"
+	ctx.ErrPath = "error"
+
 	tests := []struct {
 		Handler  http.Handler
 		ExptdErr string
@@ -245,8 +395,7 @@ func TestCallbackHandler_Errors(t *testing.T) {
 				getAuthUser,
 				findOrCreateUser,
 				genSessionCookie,
-				"http://foobar.com/success",
-				"http://foobar.com/error",
+				ctx,
 			),
 			ExptdErr: "getClient",
 		},
@@ -256,8 +405,7 @@ func TestCallbackHandler_Errors(t *testing.T) {
 				getAuthUserError,
 				findOrCreateUser,
 				genSessionCookie,
-				"http://foobar.com/success",
-				"http://foobar.com/error",
+				ctx,
 			),
 			ExptdErr: "getAuthUser",
 		},
@@ -267,8 +415,7 @@ func TestCallbackHandler_Errors(t *testing.T) {
 				getAuthUser,
 				findOrCreateUserError,
 				genSessionCookie,
-				"http://foobar.com/success",
-				"http://foobar.com/error",
+				ctx,
 			),
 			ExptdErr: "findOrCreateUser",
 		},
@@ -278,8 +425,7 @@ func TestCallbackHandler_Errors(t *testing.T) {
 				getAuthUser,
 				findOrCreateUser,
 				genSessionCookieError,
-				"http://foobar.com/success",
-				"http://foobar.com/error",
+				ctx,
 			),
 			ExptdErr: "genSessionCookie",
 		},

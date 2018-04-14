@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -14,6 +15,86 @@ import (
 
 	"golang.org/x/oauth2"
 )
+
+// Context contains information about a specific handler setup
+type Context struct {
+
+	// CookieName contains the cookie name for authentications
+	CookieName string
+
+	// PublicURL contains the base URL for public to
+	// access all paths within this context
+	PublicURL *url.URL
+
+	// Paths for doing login
+
+	AuthPath    string
+	TokenPath   string
+	LoginPath   string
+	LogoutPath  string
+	SuccessPath string
+	ErrPath     string
+}
+
+// NewContext creates a handler context from the given raw public url
+func NewContext(rawPublicURL string) (ctx *Context, err error) {
+	publicURL, err := url.Parse(rawPublicURL)
+	if err != nil {
+		return
+	}
+	ctx = &Context{
+		PublicURL: publicURL,
+	}
+	return
+}
+
+// AuthURL returns the full auth endpoint URL
+func (ctx Context) AuthURL(parts ...string) *url.URL {
+	u := *ctx.PublicURL
+	u.Path = path.Join(
+		append([]string{u.Path, ctx.AuthPath}, parts...)...)
+	return &u
+}
+
+// TokenURL returns the full auth endpoint URL
+func (ctx Context) TokenURL(parts ...string) *url.URL {
+	u := *ctx.PublicURL
+	u.Path = path.Join(
+		append([]string{u.Path, ctx.TokenPath}, parts...)...)
+	return &u
+}
+
+// LoginURL returns the full login URL
+func (ctx Context) LoginURL(parts ...string) *url.URL {
+	u := *ctx.PublicURL
+	u.Path = path.Join(
+		append([]string{u.Path, ctx.LoginPath}, parts...)...)
+	return &u
+}
+
+// LogoutURL returns the full logout URL
+func (ctx Context) LogoutURL(parts ...string) *url.URL {
+	u := *ctx.PublicURL
+	u.Path = path.Join(
+		append([]string{u.Path, ctx.LogoutPath}, parts...)...)
+	return &u
+}
+
+// SuccessURL returns the full success URL
+func (ctx Context) SuccessURL(parts ...string) *url.URL {
+	u := *ctx.PublicURL
+	u.Path = path.Join(
+		append([]string{u.Path, ctx.SuccessPath}, parts...)...)
+	return &u
+}
+
+// ErrURL returns the full error URL
+func (ctx Context) ErrURL(parts ...string) *url.URL {
+	u := *ctx.PublicURL
+	u.Path = path.Join(
+		append([]string{u.Path, ctx.ErrPath}, parts...)...)
+	return &u
+}
 
 // AuthURLFactory manufactures redirectURLs to authentication endpoint
 // with the correct callback path back to the application site.
@@ -149,16 +230,14 @@ func NewCallbackHandler(
 	getAuthUser AuthUserDecoder,
 	findOrCreateUser UserStorageCallback,
 	genSessionCookie CookieFactory,
-	successURL string,
-	errURL string,
+	ctx *Context,
 ) http.Handler {
 	return &CallbackHandler{
 		getClient:        getClient,
 		getAuthUser:      getAuthUser,
 		findOrCreateUser: findOrCreateUser,
 		genSessionCookie: genSessionCookie,
-		successURL:       successURL,
-		errURL:           errURL,
+		ctx:              ctx,
 	}
 }
 
@@ -171,15 +250,14 @@ type CallbackHandler struct {
 	getAuthUser      AuthUserDecoder
 	findOrCreateUser UserStorageCallback
 	genSessionCookie CookieFactory
-	successURL       string
-	errURL           string
+	ctx              *Context
 }
 
 // ServeHTTP implements http.Handler
 func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// for additional parameters
-	errURL, _ := url.Parse(cbh.errURL)
+	errURL, _ := url.Parse(cbh.ctx.ErrURL().String())
 
 	// get an *http.Client for the API call
 	ctx, client, err := cbh.getClient(r)
@@ -235,7 +313,7 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// set authUser digest to cookie as jwt
 	sessCookie := &http.Cookie{
-		Name:     "middleauth",
+		Name:     cbh.ctx.CookieName,
 		Path:     "/",
 		HttpOnly: true,
 		Expires:  time.Now().Add(time.Hour), // expires in 1 hour
@@ -265,15 +343,16 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, cookie)
 	http.Redirect(
 		w, r,
-		cbh.successURL,
+		cbh.ctx.SuccessURL().String(),
 		http.StatusTemporaryRedirect,
 	)
 }
 
 // LogoutHandler makes a cookie of a given name expires
-func LogoutHandler(redirectURL string, cookieName string) http.HandlerFunc {
+func LogoutHandler(ctx *Context) http.HandlerFunc {
+	redirectURL := ctx.SuccessURL().String()
 	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(cookieName)
+		cookie, err := r.Cookie(ctx.CookieName)
 		if err != nil {
 			// should have encountered http.ErrNoCookie
 			// no cookie to logout from
@@ -291,21 +370,23 @@ func LoginHandler(
 	userStorageCallback UserStorageCallback,
 	cookieFactory CookieFactory,
 	providers []AuthProvider,
-	publicURL, loginPath, successURL, errURL string,
+	ctx *Context,
 ) http.Handler {
+
+	loginPath := ensureTrailingSlash(ctx.LoginURL().Path)
+	errURL := ctx.ErrURL().Path
 
 	// Note: oauth2Path must start with "/" and must not have trailing slash
 	// Note: publicURL must be full URL without path or any trailing slash
 
 	mux := http.NewServeMux()
-	loginURL := publicURL + loginPath // full URL to oauth2 path
 	tokenStore := NewTokenStore()
 
 	if provider := FindProvider("google", providers); provider != nil {
 		mux.Handle(loginPath+"google", RedirectHandler(
 			OAuth2AuthURLFactory(GoogleConfig(
 				*provider,
-				loginURL+"google/callback",
+				ctx.LoginURL("google/callback").String(),
 			)),
 			errURL,
 		))
@@ -314,13 +395,12 @@ func LoginHandler(
 			NewCallbackHandler(
 				OAuth2CallbackDecoder(GoogleConfig(
 					*provider,
-					loginURL+"google/callback",
+					ctx.LoginURL("google/callback").String(),
 				)),
 				GoogleAuthUserFactory,
 				userStorageCallback,
 				cookieFactory,
-				successURL,
-				errURL,
+				ctx,
 			),
 		)
 	}
@@ -329,7 +409,7 @@ func LoginHandler(
 		mux.Handle(loginPath+"facebook", RedirectHandler(
 			OAuth2AuthURLFactory(FacebookConfig(
 				*provider,
-				loginURL+"facebook/callback",
+				ctx.LoginURL("facebook/callback").String(),
 			)),
 			errURL,
 		))
@@ -338,13 +418,12 @@ func LoginHandler(
 			NewCallbackHandler(
 				OAuth2CallbackDecoder(FacebookConfig(
 					*provider,
-					loginURL+"facebook/callback",
+					ctx.LoginURL("facebook/callback").String(),
 				)),
 				FacebookAuthUserFactory,
 				userStorageCallback,
 				cookieFactory,
-				successURL,
-				errURL,
+				ctx,
 			),
 		)
 	}
@@ -353,7 +432,7 @@ func LoginHandler(
 		mux.Handle(loginPath+"github", RedirectHandler(
 			OAuth2AuthURLFactory(GithubConfig(
 				*provider,
-				loginURL+"github/callback",
+				ctx.LoginURL("github/callback").String(),
 			)),
 			errURL,
 		))
@@ -362,13 +441,12 @@ func LoginHandler(
 			NewCallbackHandler(
 				OAuth2CallbackDecoder(GithubConfig(
 					*provider,
-					loginURL+"github/callback",
+					ctx.LoginURL("github/callback").String(),
 				)),
 				GithubAuthUserFactory,
 				userStorageCallback,
 				cookieFactory,
-				successURL,
-				errURL,
+				ctx,
 			),
 		)
 	}
@@ -377,7 +455,7 @@ func LoginHandler(
 		mux.Handle(loginPath+"twitter", RedirectHandler(
 			OAuth1aAuthURLFactory(
 				TwitterConsumer(*provider),
-				loginPath+"twitter/callback",
+				ctx.LoginURL("twitter/callback").String(),
 				tokenStore,
 			),
 			errURL,
@@ -392,8 +470,7 @@ func LoginHandler(
 				TwitterAuthUserFactory,
 				userStorageCallback,
 				cookieFactory,
-				successURL,
-				errURL,
+				ctx,
 			),
 		)
 	}
@@ -537,20 +614,11 @@ func CommonHandler(
 	providers []AuthProvider,
 	userStorageCallback UserStorageCallback,
 	cookieFactory CookieFactory,
-	cookieName string,
-	publicBaseURL,
-	loginPagePath,
-	loginPath,
-	logoutPath,
-	successURL,
-	errURL string,
+	ctx *Context,
 ) *http.ServeMux {
 
-	// normalize the input
-	publicBaseURL = strings.TrimRight(publicBaseURL, "/") // remove trailing slash
-	loginPagePath = ensureLeadingSlash(loginPagePath)
-	loginPath = ensureTrailingSlash(ensureLeadingSlash(loginPath))
-	logoutPath = ensureLeadingSlash(logoutPath)
+	// TODO: remove intermediate paths
+	loginPath := ensureTrailingSlash(ctx.LoginURL().Path)
 
 	// Handle login paths.
 	// Note: Trailing slash of loginPath is required for mux
@@ -559,14 +627,11 @@ func CommonHandler(
 		userStorageCallback,
 		cookieFactory,
 		providers,
-		publicBaseURL,
-		loginPath,  // base path, on top of publicBaseURL, for OAuth redirect
-		successURL, // URL after login success
-		errURL,     // URL when has login error
+		ctx,
 	))
 
 	// handle login page
-	mux.Handle(loginPagePath, LoginPageHandler(
+	mux.Handle(ctx.AuthPath, LoginPageHandler(
 		func(r *http.Request) LoginPageContent {
 			return LoginPageContent{
 				PageHeaderTitle: "Login | Example Server",
@@ -578,10 +643,6 @@ func CommonHandler(
 	))
 
 	// handle logout path
-	mux.Handle(logoutPath, LogoutHandler(
-		successURL, // path after logout success
-		cookieName,
-	))
-
+	mux.Handle(ctx.LogoutPath, LogoutHandler(ctx))
 	return mux
 }
