@@ -23,6 +23,7 @@ func main() {
 
 	db := getDB() // gorm.db for user data storage
 	defer db.Close()
+	gormstorage.AutoMigrate(db)
 
 	jwtKey := "some-encryption-key"
 
@@ -42,16 +43,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 	handlerCtx.AuthPath = "/login"
 	handlerCtx.LoginPath = "/login/oauth2"
 	handlerCtx.LogoutPath = "/logout"
 	handlerCtx.SuccessPath = ""
 	handlerCtx.ErrPath = "/error"
+
 	middleauth.CommonHandler(
 		mux,
 		middleauth.EnvProviders(os.Getenv),
-		gormstorage.UserStorageCallback(db),
+		middleauth.TrustAllAuth(gormstorage.UserStorageCallback(db)),
 		mySession,
 		handlerCtx,
 	)

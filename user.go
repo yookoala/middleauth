@@ -1,6 +1,7 @@
 package middleauth
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -151,4 +152,19 @@ func (err LoginError) GoString() string {
 		return "LoginError(\"" + err.String() + "\")"
 	}
 	return "LoginError(" + err.String() + ")"
+}
+
+// TrustAllAuth automatically set all new UserIdentity as Verified.
+//
+// By default, all UserIdentity generated will have Verified
+// set to false. Also the newly created User will inherit
+// the Verified flag.
+//
+// Thus changing the UserIdentity input to inner UserStorageCallback
+// will make the newly created User.Verified == true.
+func TrustAllAuth(inner UserStorageCallback) UserStorageCallback {
+	return func(ctx context.Context, authIdentity *UserIdentity) (ctxNext context.Context, confirmedUser *User, err error) {
+		authIdentity.Verified = true
+		return inner(ctx, authIdentity)
+	}
 }
