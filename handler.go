@@ -257,7 +257,7 @@ type CallbackHandler struct {
 func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// for additional parameters
-	errURL, _ := url.Parse(cbh.ctx.ErrURL().String())
+	errURL := cbh.ctx.ErrURL()
 
 	// get an *http.Client for the API call
 	ctx, client, err := cbh.getClient(r)
@@ -267,8 +267,9 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}).Error("failed to create API client")
 
 		q := url.Values{}
-		q.Add("message", "failed to create API client")
-		q.Add("error", err.Error())
+		q.Add("error", "internal_server_error")
+		q.Add("error_description", "failed to create API client")
+		q.Add("error_details", err.Error())
 		errURL.RawQuery = q.Encode()
 		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
@@ -282,8 +283,9 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}).Error("failed retrieve authenticating user info from OAuth2 provider")
 
 		q := url.Values{}
-		q.Add("message", "failed retrieve authenticating user info from OAuth2 provider")
-		q.Add("error", err.Error())
+		q.Add("error", "login_error")
+		q.Add("error_description", "failed retrieve authenticating user info from OAuth2 provider")
+		q.Add("error_details", err.Error())
 		errURL.RawQuery = q.Encode()
 		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
@@ -298,8 +300,9 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}).Error("failed to find or create authenticating user")
 
 		q := url.Values{}
-		q.Add("message", "failed to find or create authenticating user")
-		q.Add("error", err.Error())
+		q.Add("error", "login_error")
+		q.Add("error_description", "failed to find or create authenticating user")
+		q.Add("error_details", err.Error())
 		errURL.RawQuery = q.Encode()
 		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return
@@ -574,6 +577,50 @@ const loginPageHTML = `
 </html>
 `
 
+const errorPageHTML = `
+<!doctype html>
+<html>
+<head>
+<style>
+.error-box .field {
+	display: flex;
+}
+.error-box .field .name {
+	width: 8em;
+}
+.error-box .field .value {
+	flex: 1;
+}
+</style>
+</head>
+<body id="page-error">
+<main>
+<div class="error-box">
+	<h1>{{ .Title }}</h1>
+	{{ if .Description }}
+		<div class="field field-description">
+			<div class="name">Description</div>
+			<div class="value">{{ .Description }}</div>
+		</div>
+	{{ end }}
+	{{ if .Details }}
+		<div class="field field-details">
+			<div class="name">Details</div>
+			<div class="value">{{ .Details }}</div>
+		</div>
+	{{ end }}
+	{{ if .URI }}
+		<div class="field field-uri">
+			<div class="name">URI</div>
+			<div class="value">{{ .URI }}</div>
+		</div>
+	{{ end }}
+</div>
+</main>
+</body>
+</html>
+`
+
 // LoginPageContent is the contents to be filled to the login page
 type LoginPageContent struct {
 	PageTitle       string
@@ -645,4 +692,32 @@ func CommonHandler(
 	// handle logout path
 	mux.Handle(ctx.LogoutPath, LogoutHandler(ctx))
 	return mux
+}
+
+// ErrHandler handles the error arrose from internal storage and entity
+// and not from the provider's login. Display the login error.
+func ErrHandler(ctx *Context) http.HandlerFunc {
+	tpl := template.New("login")
+	tpl = template.Must(tpl.Parse(errorPageHTML))
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		errReport := struct {
+			Title       string
+			Type        string
+			Description string
+			Details     string
+			URI         string
+		}{
+			Title:       strings.Title(strings.Replace(r.FormValue("error"), "_", " ", -1)),
+			Type:        r.FormValue("error"),
+			Description: r.FormValue("error_description"),
+			Details:     r.FormValue("error_details"),
+			URI:         r.FormValue("error_uri"),
+		}
+
+		err := tpl.Execute(w, errReport)
+		if err != nil {
+			logrus.Error(err)
+		}
+	}
 }

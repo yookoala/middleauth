@@ -68,9 +68,7 @@ func main() {
 			fmt.Fprintf(w, `You have not login. Please <a href="/login">login here</a>.`)
 		}
 	})
-	appMux.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "error!")
-	})
+	appMux.HandleFunc("/error", middleauth.ErrHandler(handlerCtx))
 
 	// middleware that decodes JWT session
 	// and get user from gorm db storage
