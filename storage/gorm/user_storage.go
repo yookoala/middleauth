@@ -191,26 +191,6 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 			return
 		}
 
-		// create user-email relation
-		newUserEmail := middleauth.UserEmail{
-			UserID: newUser.ID,
-			Email:  newUser.PrimaryEmail,
-		}
-		if res := tx.Create(&newUserEmail); res.Error != nil {
-			// append newUserEmail to error info
-			err = &middleauth.LoginError{
-				Type: middleauth.ErrDatabase,
-				Action: fmt.Sprintf(
-					"create user-email relation (user_id=%s email=%s)",
-					newUser.ID,
-					newUserEmail.Email,
-				),
-				Err: res.Error,
-			}
-			tx.Rollback()
-			return
-		}
-
 		// commit change and return new user
 		tx.Commit()
 		confirmedUser = &newUser
