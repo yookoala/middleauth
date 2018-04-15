@@ -54,9 +54,9 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 					Type: middleauth.ErrUserNotFound,
 					Action: fmt.Sprintf(
 						"find user (id=%s) for identity (provider=%s, provider_id=%s)",
-						authIdentity.UserID,
-						authIdentity.Provider,
-						authIdentity.ProviderID,
+						prevIdentity.UserID,
+						prevIdentity.Provider,
+						prevIdentity.ProviderID,
 					),
 					Err: fmt.Errorf("User of the identity not found. Probably deleted."),
 				}
@@ -69,9 +69,9 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 					Type: middleauth.ErrUserEmailNotVerified,
 					Action: fmt.Sprintf(
 						"login user (id = %s) for identity (provider = %s, provider_id = %s)",
-						authIdentity.UserID,
-						authIdentity.Provider,
-						authIdentity.ProviderID,
+						prevIdentity.UserID,
+						prevIdentity.Provider,
+						prevIdentity.ProviderID,
 					),
 					User: &prevUser,
 				}
@@ -84,9 +84,9 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 					Type: middleauth.ErrUserIdentityNotVerified,
 					Action: fmt.Sprintf(
 						"login user (id = %s) for identity (provider = %s, provider_id = %s)",
-						authIdentity.UserID,
-						authIdentity.Provider,
-						authIdentity.ProviderID,
+						prevIdentity.UserID,
+						prevIdentity.Provider,
+						prevIdentity.ProviderID,
 					),
 					User: &prevUser,
 				}
