@@ -15,6 +15,7 @@ func RetrieveUser(db *gorm.DB) middleauth.RetrieveUser {
 		db.First(&users, "id = ?", id)
 		if len(users) < 1 {
 			err = db.Error
+			return
 		}
 
 		user = &users[0]
