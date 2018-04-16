@@ -448,9 +448,10 @@ func TestCallbackHandler_Errors(t *testing.T) {
 			t.Errorf("unexpected parse error for url: %#v, error: %s",
 				redirectURL, err.Error(),
 			)
-		} else if want, have := test.ExptdErr, parsed.Query().Get("error"); want != have {
+		} else if want, have := test.ExptdErr, parsed.Query().Get("error_details"); want != have {
+			t.Logf("query: %#v", parsed.Query().Encode())
 			t.Errorf("wanted %#v, got %#v", want, have)
-		} else if parsed.Query().Get("message") == "" {
+		} else if parsed.Query().Get("error_description") == "" {
 			t.Error("unexpected empty message field.")
 		}
 	}

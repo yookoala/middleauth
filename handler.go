@@ -332,8 +332,9 @@ func (cbh *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}).Error("failed to generate session cookie")
 
 		q := url.Values{}
-		q.Add("message", "failed to generate session cookie")
-		q.Add("error", err.Error())
+		q.Add("error", "internal_server_error")
+		q.Add("error_description", "failed to generate session cookie")
+		q.Add("error_details", err.Error())
 		errURL.RawQuery = q.Encode()
 		http.Redirect(w, r, errURL.String(), http.StatusTemporaryRedirect)
 		return

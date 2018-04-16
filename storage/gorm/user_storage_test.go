@@ -534,7 +534,7 @@ func TestLoadOrCreateUser_databaseError(t *testing.T) {
 
 	// test inserting with a missing table
 	gormstorage.AutoMigrate(db)
-	db.Exec("DROP TABLE user_emails;")
+	db.Exec("DROP TABLE user_identities;")
 	callback := gormstorage.UserStorageCallback(db)
 	_, u1, err := callback(
 		context.TODO(),
