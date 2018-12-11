@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/gofrs/uuid"
 	"github.com/mrjones/oauth"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yookoala/middleauth"
 	"golang.org/x/oauth2"
 )
@@ -270,7 +270,7 @@ func TestCallbackHandler(t *testing.T) {
 
 	getAuthUser := middleauth.AuthUserDecoder(func(ctx context.Context, client *http.Client) (ctxNext context.Context, authUser *middleauth.UserIdentity, err error) {
 		var ID uuid.UUID
-		ID = uuid.NewV4()
+		ID, _ = uuid.NewV4()
 		ctxNext = ctx
 		authUser = &middleauth.UserIdentity{
 			Name:       "dummy user",
@@ -283,7 +283,7 @@ func TestCallbackHandler(t *testing.T) {
 
 	findOrCreateUser := middleauth.UserStorageCallback(func(ctx context.Context, authIdentity *middleauth.UserIdentity) (ctxNext context.Context, confirmedUser *middleauth.User, err error) {
 		var ID uuid.UUID
-		ID = uuid.NewV4()
+		ID, _ = uuid.NewV4()
 		ctxNext = ctx
 		confirmedUser = &middleauth.User{
 			ID:           ID.String(),
@@ -341,7 +341,7 @@ func TestCallbackHandler_Errors(t *testing.T) {
 		ctxNext = ctx
 
 		var ID uuid.UUID
-		ID = uuid.NewV4()
+		ID, _ = uuid.NewV4()
 		authUser = &middleauth.UserIdentity{
 			Name:       "dummy user",
 			Provider:   "dummy provider",

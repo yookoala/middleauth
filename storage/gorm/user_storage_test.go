@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yookoala/middleauth"
 	gormstorage "github.com/yookoala/middleauth/storage/gorm"
 )
@@ -18,7 +18,10 @@ func (logger NopLogwriter) Println(v ...interface{}) {
 }
 
 func randID() string {
-	return uuid.NewV4().String()
+	if id, err := uuid.NewV4(); err == nil {
+		return id.String()
+	}
+	return "failed-to-generate-uuid-v4"
 }
 
 func TestLoadOrCreateUser_normalFlow(t *testing.T) {

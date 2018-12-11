@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/yookoala/middleauth"
 
 	"gopkg.in/jose.v1/crypto"
@@ -123,7 +123,7 @@ func TestJWTSession(t *testing.T) {
 	method := crypto.SigningMethodHS256
 
 	var userID uuid.UUID
-	userID = uuid.NewV4()
+	userID, _ = uuid.NewV4()
 
 	factory := middleauth.JWTSession("dummy-cookie", jwtKey, method)
 	confirmedUser := middleauth.User{

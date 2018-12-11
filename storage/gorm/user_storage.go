@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/jinzhu/gorm"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yookoala/middleauth"
 )
 
@@ -58,7 +58,7 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 						prevIdentity.Provider,
 						prevIdentity.ProviderID,
 					),
-					Err: fmt.Errorf("User of the identity not found. Probably deleted."),
+					Err: fmt.Errorf("User of the identity not found. Probably deleted"),
 				}
 				return
 			}
@@ -147,7 +147,7 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 
 		// generate random UUID as the ID of new User
 		var userID uuid.UUID
-		userID = uuid.NewV4()
+		userID, _ = uuid.NewV4()
 		newUser := middleauth.User{
 			ID:           userID.String(),
 			Name:         authIdentity.Name,

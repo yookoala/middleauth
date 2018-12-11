@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	"gopkg.in/jose.v1/crypto"
 )
 
@@ -21,7 +21,7 @@ func TestAuthJWTCookie(t *testing.T) {
 	jwtKey := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	var userID uuid.UUID
-	userID = uuid.NewV4()
+	userID, _ = uuid.NewV4()
 	user := User{
 		ID:           userID.String(),
 		Name:         "Hello User",
