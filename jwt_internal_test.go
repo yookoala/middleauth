@@ -21,7 +21,7 @@ func TestAuthJWTCookie(t *testing.T) {
 	jwtKey := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	var userID uuid.UUID
-	userID, _ = uuid.NewV4()
+	userID = uuid.NewV4()
 	user := User{
 		ID:           userID.String(),
 		Name:         "Hello User",

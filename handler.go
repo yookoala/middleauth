@@ -10,7 +10,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/mrjones/oauth"
 
 	"golang.org/x/oauth2"

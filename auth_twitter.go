@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/go-restit/lzjson"
 	"github.com/mrjones/oauth"
 )

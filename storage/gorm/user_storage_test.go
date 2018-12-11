@@ -18,8 +18,7 @@ func (logger NopLogwriter) Println(v ...interface{}) {
 }
 
 func randID() string {
-	ID, _ := uuid.NewV4()
-	return ID.String()
+	return uuid.NewV4().String()
 }
 
 func TestLoadOrCreateUser_normalFlow(t *testing.T) {

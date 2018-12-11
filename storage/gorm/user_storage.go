@@ -147,11 +147,7 @@ func UserStorageCallback(db *gorm.DB) middleauth.UserStorageCallback {
 
 		// generate random UUID as the ID of new User
 		var userID uuid.UUID
-		userID, err = uuid.NewV4()
-		if err != nil {
-			err = fmt.Errorf("error generating userID (%s)", err.Error())
-			return
-		}
+		userID = uuid.NewV4()
 		newUser := middleauth.User{
 			ID:           userID.String(),
 			Name:         authIdentity.Name,
